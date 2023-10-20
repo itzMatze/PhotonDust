@@ -27,6 +27,9 @@ namespace ve
         uniform_buffer = storage.add_named_buffer("uniform_buffer", sizeof(Camera::Data), vk::BufferUsageFlagBits::eUniformBuffer, false, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer);
 
         // set up buffers for path tracing
+        std::vector<float> initial_buffer_data(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
+        path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_0", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
+        path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_1", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
 
         // set up textures that will be rendered
         render_textures.push_back(storage.add_named_image("render_texture_0", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc));
@@ -47,6 +50,8 @@ namespace ve
         render_textures.clear();
         for (uint32_t i : path_trace_images) storage.destroy_image(i);
         path_trace_images.clear();
+        for (uint32_t i : path_trace_buffers) storage.destroy_buffer(i);
+        path_trace_buffers.clear();
         storage.destroy_buffer(uniform_buffer);
         ui.self_destruct();
         scene.self_destruct();
@@ -117,6 +122,8 @@ namespace ve
         path_tracer_dsh.add_binding(1, vk::DescriptorType::eAccelerationStructureKHR, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(2, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(3, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
+        path_tracer_dsh.add_binding(4, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        path_tracer_dsh.add_binding(5, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(10, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(11, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(12, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
@@ -131,6 +138,8 @@ namespace ve
             path_tracer_dsh.add_descriptor(1, storage.get_buffer_by_name("tlas"));
             path_tracer_dsh.add_descriptor(2, storage.get_image(path_trace_images[i]));
             path_tracer_dsh.add_descriptor(3, storage.get_image(path_trace_images[1 - i]));
+            path_tracer_dsh.add_descriptor(4, storage.get_buffer(path_trace_buffers[i]));
+            path_tracer_dsh.add_descriptor(5, storage.get_buffer(path_trace_buffers[1 - i]));
             path_tracer_dsh.add_descriptor(10, storage.get_buffer_by_name("vertices"));
             path_tracer_dsh.add_descriptor(11, storage.get_buffer_by_name("indices"));
             path_tracer_dsh.add_descriptor(12, storage.get_buffer_by_name("materials"));
@@ -156,6 +165,8 @@ namespace ve
             app_state.cam.data.u = app_state.cam.getRight();
             app_state.cam.data.v = app_state.cam.getUp();
             app_state.cam.data.w = app_state.cam.getFront();
+            if (!app_state.force_accumulate_samples && (old_cam_data != app_state.cam.data || !app_state.accumulate_samples)) ptpc.sample_count = 0;
+            old_cam_data = app_state.cam.data;
             storage.get_buffer(uniform_buffer).update_data_bytes(&app_state.cam.data, sizeof(Camera::Data));
         }
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)
@@ -166,7 +177,7 @@ namespace ve
         uint32_t read_only_image = (app_state.total_frames / frames_in_flight) % frames_in_flight;
         if (app_state.save_screenshot)
         {
-            storage.get_image(read_only_image).save_to_file(vcc);
+            storage.get_image(path_trace_images[read_only_image]).save_to_file(vcc);
             app_state.save_screenshot = false;
         }
         render(image_idx.value, read_only_image, app_state);
@@ -193,9 +204,10 @@ namespace ve
             vk::CommandBuffer& compute_cb = vcc.begin(vcc.compute_cbs[0]);
             compute_cb.bindPipeline(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get());
             compute_cb.bindDescriptorSets(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get_layout(), 0, path_tracer_dsh.get_sets()[read_only_image], {});
-            // compute_cb.pushConstants(path_tracer_compute_pipeline.get_layout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PathTracerPushConstants), &ptpc);
+            compute_cb.pushConstants(path_tracer_compute_pipeline.get_layout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PathTracerPushConstants), &ptpc);
             compute_cb.dispatch((app_state.render_extent.width + 31) / 32, (app_state.render_extent.height + 31) / 32, 1);
             compute_cb.end();
+            ptpc.sample_count++;
         }
 
         vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cbs[app_state.current_frame]);

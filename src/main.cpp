@@ -45,8 +45,6 @@ public:
         }
         for (const auto& name : scene_names) app_state.scene_names.push_back(&name.front());
         wc.load_scene(app_state.scene_names[app_state.current_scene]);
-        constexpr float min_frametime = 5.0f;
-        // keep time measurement and frametime separate to be able to use a frame limiter
         ve::HostTimer timer;
         bool quit = false;
         SDL_Event e;
@@ -58,7 +56,6 @@ public:
             app_state.cam.updateVP(app_state.time_diff);
             try
             {
-                //std::this_thread::sleep_for(std::chrono::duration<float, std::milli>(min_frametime - gs.frametime));
                 wc.draw_frame(app_state);
             }
             catch (const vk::OutOfDateKHRError e)
@@ -72,8 +69,6 @@ public:
             }
             app_state.time_diff = timer.restart();
             app_state.time += app_state.time_diff;
-            // calculate actual frametime by subtracting the waiting time
-            //gs.frametime = gs.time_diff - std::max(0.0f, min_frametime - gs.frametime);
             if (app_state.load_scene)
             {
                 app_state.load_scene = false;

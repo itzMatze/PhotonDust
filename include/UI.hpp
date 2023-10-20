@@ -17,18 +17,18 @@ namespace ve
         Camera cam;
         float time_diff = 0.000001f;
         float time = 0.0f;
-        float frametime = 0.0f;
         int32_t current_scene = 0;
         uint32_t current_frame = 0;
         uint32_t total_frames = 0;
         bool load_scene = false;
-        bool show_ui = false;
+        bool show_ui = true;
         bool mesh_view = false;
         bool normal_view = false;
         bool color_view = false;
         bool tex_view = false;
         bool save_screenshot = false;
-        bool path_tracer_active = true;
+        bool accumulate_samples = true;
+        bool force_accumulate_samples = false;
     };
 
     class UI
@@ -43,7 +43,6 @@ namespace ve
 		vk::DescriptorPool imgui_pool;
         FixVector<float> frametime_values;
         float time_diff = 0.0f;
-        float frametime = 0.0f;
         std::vector<FixVector<float>> devicetiming_values;
         std::vector<float> devicetimings;
 	};

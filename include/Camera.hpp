@@ -34,6 +34,16 @@ public:
         alignas(16) glm::vec3 w;
         alignas(8) glm::vec2 sensor_size;
         alignas(4) float focal_length;
+
+        bool operator==(const Data& cam_data)
+        {
+            return (this->pos == cam_data.pos && this->u == cam_data.u && this->v == cam_data.v && this->w == cam_data.w && this->sensor_size == cam_data.sensor_size && this->focal_length == cam_data.focal_length);
+        }
+
+        bool operator!=(const Data& cam_data)
+        {
+            return !(*this == cam_data);
+        }
     } data;
 
 private:

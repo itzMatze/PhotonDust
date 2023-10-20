@@ -10,14 +10,8 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-struct CameraData
-{
-    vec3 pos;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    vec2 sensor_size;
-    float focal_length;
+layout(push_constant) uniform PushConstant {
+    PathTracerPushConstants pc;
 };
 
 layout(binding = 0) uniform UniformBuffer
@@ -27,6 +21,14 @@ layout(binding = 0) uniform UniformBuffer
 layout(binding = 1) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 2, rgba8) uniform restrict readonly image2D input_image;
 layout(binding = 3, rgba8) uniform restrict writeonly image2D output_image;
+layout(binding = 4) readonly buffer InputPixelBuffer
+{
+    PixelData input_pixel_data[];
+};
+layout(binding = 5) writeonly buffer OutputPixelBuffer
+{
+    PixelData output_pixel_data[];
+};
 layout(binding = 10) readonly buffer VertexBuffer
 {
     AlignedVertex vertices[];
@@ -53,37 +55,8 @@ layout(binding = 16) readonly buffer LightBuffer
     Light lights[];
 };
 
-uint rng_state;
-
-uint PCGHashState()
-{
-    rng_state = rng_state * 747796405u + 2891336453u;
-    uint state = rng_state;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-uint PCGHash(uint seed)
-{
-    uint state = seed * 747796405u + 2891336453u;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-float pcg_random_state()
-{
-    return (float(PCGHashState()) / float(0xFFFFFFFFU));
-}
-
-float pcg_random_state_clipped_spatial()
-{
-    return cos(PI * PCGHashState()) * (((float(PCGHashState()) / float(0xFFFFFFFFU)) * 2.0) + 1.0);
-}
-
-float pcg_random(uint seed)
-{
-    return (float(PCGHash(seed)) / float(0xFFFFFFFFU));
-}
+#include "random.glsl"
+#include "spectral.glsl"
 
 bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out int geometry_idx, out int primitive_idx, out vec2 bary)
 {
@@ -137,10 +110,13 @@ void main()
     ivec2 viewport_size = imageSize(output_image);
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     if (pixel.x > viewport_size.x || pixel.y > viewport_size.y) return;
-    vec2 norm_pixel = (vec2(pixel) / vec2(viewport_size) - 0.5) * camera_data.sensor_size;
+    rng_state = (pixel.y * viewport_size.x + pixel.x + (pc.sample_count + 3) * viewport_size.x * viewport_size.y);
+    vec2 jitter = vec2(pcg_random_state(), pcg_random_state()) - 0.5;
+    vec2 norm_pixel = ((vec2(pixel) + jitter) / vec2(viewport_size) - 0.5) * camera_data.sensor_size;
     vec3 p = camera_data.pos;
     vec3 dir = normalize(-camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v);
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
+    uint wavelength = 380 + uint(pcg_random_state() * 400.0);
     float t = 0.0;
     int instance_id = 0;
     int primitive_idx = 0;
@@ -156,5 +132,11 @@ void main()
     {
         out_color = vec4(0.0, 0.0, 0.5, 1.0);
     }
+    out_color *= wavelength_to_rgba(wavelength);
+    if (pc.sample_count > 0)
+    {
+        out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);
+    }
+    output_pixel_data[pixel.y * viewport_size.x + pixel.x].col = out_color;
     imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), out_color);
 }

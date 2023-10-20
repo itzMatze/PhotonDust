@@ -43,7 +43,9 @@ namespace ve
         DescriptorSetHandler path_tracer_dsh;
         std::vector<uint32_t> render_textures;
         std::vector<uint32_t> path_trace_images;
+        std::vector<uint32_t> path_trace_buffers;
         uint32_t uniform_buffer;
+        Camera::Data old_cam_data;
 
         struct PathTracerPushConstants
         {

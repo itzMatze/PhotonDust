@@ -101,9 +101,11 @@ namespace ve
         ImGui::DragFloat("Camera sensor width", &app_state.cam.data.sensor_size.x, 0.001f, 0.001f, 0.05f);
         app_state.cam.data.sensor_size.y = app_state.cam.data.sensor_size.x / app_state.aspect_ratio;
         ImGui::DragFloat("Camera focal length", &app_state.cam.data.focal_length, 0.001f, 0.001f, 0.5f);
+        ImGui::Separator();
+        ImGui::Checkbox("Accumulate samples", &app_state.accumulate_samples);
+        ImGui::Checkbox("Force accumulate samples", &app_state.force_accumulate_samples);
         time_diff = time_diff * (1 - update_weight) + app_state.time_diff * update_weight;
-        frametime = frametime * (1 - update_weight) + app_state.frametime * update_weight;
-        frametime_values.push_back(app_state.frametime);
+        frametime_values.push_back(app_state.time_diff);
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)
         {
             if (!std::signbit(app_state.devicetimings[i])) 
@@ -114,7 +116,7 @@ namespace ve
         }
         if (ImGui::CollapsingHeader("Timings"))
         {
-            ImGui::Text((ve::to_string(time_diff * 1000, 4) + " ms; FPS: " + ve::to_string(1.0 / time_diff) + " (" + ve::to_string(frametime, 4) + " ms; FPS: " + ve::to_string(1000.0 / frametime) + ")").c_str());
+            ImGui::Text((ve::to_string(time_diff * 1000, 4) + " ms; FPS: " + ve::to_string(1.0 / time_diff)).c_str());
             ImGui::Text(("RENDERING_ALL: " + ve::to_string(devicetimings[DeviceTimer::RENDERING_ALL], 4) + " ms").c_str());
         }
         if (ImGui::CollapsingHeader("Plots"))

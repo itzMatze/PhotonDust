@@ -1,3 +1,21 @@
+struct PathTracerPushConstants {
+    uint sample_count;
+};
+
+struct CameraData
+{
+    vec3 pos;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    vec2 sensor_size;
+    float focal_length;
+};
+
+struct PixelData {
+    vec4 col;
+};
+
 struct MeshRenderData {
     int mat_idx;
     uint indices_idx;

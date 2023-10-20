@@ -54,6 +54,6 @@ namespace ve
         void create_render_descriptor_set();
         void create_path_tracer_pipeline();
         void create_path_tracer_descriptor_set();
-        void render(uint32_t image_idx, AppState& app_state);
+        void render(uint32_t image_idx, uint32_t read_only_image, AppState& app_state);
     };
 } // namespace ve

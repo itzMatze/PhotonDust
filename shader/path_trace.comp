@@ -156,5 +156,5 @@ void main()
     {
         out_color = vec4(0.0, 0.0, 0.5, 1.0);
     }
-    imageStore(output_image, pixel, out_color);
+    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), out_color);
 }

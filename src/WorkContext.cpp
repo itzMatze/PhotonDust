@@ -163,11 +163,13 @@ namespace ve
             double timing = timers[app_state.current_frame].get_result_by_idx(i);
             app_state.devicetimings[i] = timing;
         }
+        uint32_t read_only_image = (app_state.total_frames / frames_in_flight) % frames_in_flight;
         if (app_state.save_screenshot)
         {
+            storage.get_image(read_only_image).save_to_file(vcc);
             app_state.save_screenshot = false;
         }
-        render(image_idx.value, app_state);
+        render(image_idx.value, read_only_image, app_state);
         app_state.current_frame = (app_state.current_frame + 1) % frames_in_flight;
         app_state.total_frames++;
     }
@@ -184,12 +186,11 @@ namespace ve
         return swapchain.get_extent();
     }
 
-    void WorkContext::render(uint32_t image_idx, AppState& app_state)
+    void WorkContext::render(uint32_t image_idx, uint32_t read_only_image, AppState& app_state)
     {
-        uint32_t read_only_image = (app_state.total_frames / frames_in_flight) % frames_in_flight;
         if (app_state.current_frame == 0)
         {
-            vk::CommandBuffer& compute_cb = vcc.begin(vcc.compute_cb[0]);
+            vk::CommandBuffer& compute_cb = vcc.begin(vcc.compute_cbs[0]);
             compute_cb.bindPipeline(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get());
             compute_cb.bindDescriptorSets(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get_layout(), 0, path_tracer_dsh.get_sets()[read_only_image], {});
             // compute_cb.pushConstants(path_tracer_compute_pipeline.get_layout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PathTracerPushConstants), &ptpc);
@@ -197,7 +198,7 @@ namespace ve
             compute_cb.end();
         }
 
-        vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cb[app_state.current_frame]);
+        vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cbs[app_state.current_frame]);
         perform_image_layout_transition(cb, storage.get_image(render_textures[app_state.current_frame]).get_image(), vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eNone, vk::AccessFlagBits::eTransferWrite, 0, 1, 1);
         perform_image_layout_transition(cb, storage.get_image(path_trace_images[read_only_image]).get_image(), vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eMemoryWrite, vk::AccessFlagBits::eTransferRead, 0, 1, 1);
 
@@ -250,7 +251,7 @@ namespace ve
             compute_si.sType = vk::StructureType::eSubmitInfo;
             compute_si.waitSemaphoreCount = 0;
             compute_si.commandBufferCount = 1;
-            compute_si.pCommandBuffers = &vcc.compute_cb[0];
+            compute_si.pCommandBuffers = &vcc.compute_cbs[0];
             compute_si.signalSemaphoreCount = 0;
             vmc.get_compute_queue().submit(compute_si, syncs[0].get_fence(Synchronization::F_COMPUTE_FINISHED));
         }
@@ -265,7 +266,7 @@ namespace ve
         render_si.pWaitSemaphores = render_wait_semaphores.data();
         render_si.pWaitDstStageMask = render_wait_stages.data();
         render_si.commandBufferCount = 1;
-        render_si.pCommandBuffers = &vcc.graphics_cb[app_state.current_frame];
+        render_si.pCommandBuffers = &vcc.graphics_cbs[app_state.current_frame];
         render_si.signalSemaphoreCount = 1;
         render_si.pSignalSemaphores = &syncs[app_state.current_frame].get_semaphore(Synchronization::S_RENDER_FINISHED);
         vmc.get_graphics_queue().submit(render_si, syncs[app_state.current_frame].get_fence(Synchronization::F_RENDER_FINISHED));

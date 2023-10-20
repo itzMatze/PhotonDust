@@ -137,7 +137,7 @@ namespace ve
 
     void copy_buffer_to_image(VulkanCommandContext& vcc, const Buffer& buffer, vk::Extent3D extent, vk::Image image, uint32_t layer_count, uint32_t pixel_byte_size)
     {
-        vk::CommandBuffer& cb = vcc.begin(vcc.transfer_cb[0]);
+        vk::CommandBuffer& cb = vcc.get_one_time_transfer_buffer();
         std::vector<vk::BufferImageCopy> copy_regions;
         for (uint32_t i = 0; i < layer_count; ++i)
         {
@@ -171,7 +171,7 @@ namespace ve
 
         auto move_buffer_to_image = [&](vk::Image image, uint32_t mip_levels) -> void {
             // copy image data to tmp_image
-            vk::CommandBuffer& cb = vcc.begin(vcc.transfer_cb[0]);
+            vk::CommandBuffer& cb = vcc.get_one_time_transfer_buffer();
             perform_image_layout_transition(cb, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, vk::AccessFlagBits::eTransferWrite, 0, mip_levels, layer_count);
             vcc.submit_transfer(cb, true);
             copy_buffer_to_image(vcc, buffer, vk::Extent3D(w, h, 1), image, layer_count, c);
@@ -191,7 +191,7 @@ namespace ve
             byte_size = w * h * 4;
 
             // create image with reduced resolution by blitting
-            vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cb[0]);
+            vk::CommandBuffer& cb = vcc.get_one_time_graphics_buffer();
             perform_image_layout_transition(cb, tmp_image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead, 0, 1, layer_count);
             std::tie(image, vmaa) = create_image(queue_family_indices, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | usage_flags, vk::SampleCountFlagBits::e1, true, format, vk::Extent3D(w, h, 1), layer_count, vmc.va);
             perform_image_layout_transition(cb, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, vk::AccessFlagBits::eTransferWrite, 0, mip_levels, layer_count);
@@ -272,14 +272,27 @@ namespace ve
     void Image::transition_image_layout(VulkanCommandContext& vcc, vk::ImageLayout new_layout, vk::PipelineStageFlags src_stage_flags, vk::PipelineStageFlags dst_stage_flags, vk::AccessFlags src_access_flags, vk::AccessFlags dst_access_flags)
     {
         // transition the image layout of this image
-        vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cb[0]);
+        vk::CommandBuffer& cb = vcc.get_one_time_graphics_buffer();
         perform_image_layout_transition(cb, image, layout, new_layout, src_stage_flags, dst_stage_flags, src_access_flags, dst_access_flags, 0, mip_levels, layer_count);
         vcc.submit_graphics(cb, true);
         layout = new_layout;
     }
 
-    void Image::save_to_file()
+    void Image::save_to_file(VulkanCommandContext& vcc)
     {
+        vk::ImageLayout old_layout = layout;
+        vk::CommandBuffer& cb = vcc.get_one_time_graphics_buffer();
+        auto [dst_image, tmp_vmaa] = create_image(std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc, vk::SampleCountFlagBits::e1, false, format, vk::Extent3D(w, h, 1), layer_count, vmc.va, true);
+
+        perform_image_layout_transition(cb, dst_image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eNone, vk::AccessFlagBits::eTransferWrite, 0, 1, 1);
+        perform_image_layout_transition(cb, image, old_layout, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eMemoryRead ,vk::AccessFlagBits::eTransferRead, 0, 1, 1);
+
+        copy_image(cb, image, dst_image, w, h, 1);
+
+        perform_image_layout_transition(cb, dst_image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eMemoryRead, 0, 1, 1);
+        perform_image_layout_transition(cb, image, vk::ImageLayout::eTransferSrcOptimal, old_layout, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eMemoryRead, 0, 1, 1);
+        vcc.submit_graphics(cb, true);
+
         // create target directory if needed
         std::string filename("../images/");
         std::filesystem::path images_path(filename);
@@ -302,10 +315,10 @@ namespace ve
         // get resource layout of image to read it correctly
         vk::ImageSubresource sub_resource{vk::ImageAspectFlagBits::eColor, 0, 0};
         vk::SubresourceLayout sub_resource_layout;
-        vmc.logical_device.get().getImageSubresourceLayout(image, &sub_resource, &sub_resource_layout);
+        vmc.logical_device.get().getImageSubresourceLayout(dst_image, &sub_resource, &sub_resource_layout);
 
         char* data;
-        vmaMapMemory(vmc.va, vmaa, (void**)&data);
+        vmaMapMemory(vmc.va, tmp_vmaa, (void**)&data);
         data += sub_resource_layout.offset;
 
         std::vector<vk::Format> bgr_formats = {vk::Format::eB8G8R8A8Srgb, vk::Format::eB8G8R8A8Unorm, vk::Format::eB8G8R8A8Snorm};
@@ -337,7 +350,8 @@ namespace ve
         }
 
         stbi_write_png(filename.c_str(), w, h, c, (void**)image_data.data(), w * c);
-        vmaUnmapMemory(vmc.va, vmaa);
+        vmaUnmapMemory(vmc.va, tmp_vmaa);
+        vmaDestroyImage(vmc.va, VkImage(dst_image), tmp_vmaa);
     }
 
     vk::DeviceSize Image::get_byte_size() const
@@ -372,7 +386,7 @@ namespace ve
 
     void Image::generate_mipmaps(VulkanCommandContext& vcc)
     {
-        vk::CommandBuffer& cb = vcc.begin(vcc.graphics_cb[0]);
+        vk::CommandBuffer& cb = vcc.get_one_time_graphics_buffer();
         vk::ImageMemoryBarrier imb{};
         imb.sType = vk::StructureType::eImageMemoryBarrier;
         imb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

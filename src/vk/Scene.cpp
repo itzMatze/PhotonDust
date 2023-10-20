@@ -13,7 +13,7 @@ namespace ve
     void Scene::construct()
     {
         if (!loaded) VE_THROW("Cannot construct scene before loading one!");
-        vk::CommandBuffer& cb = vcc.begin(vcc.compute_cb[0]);
+        vk::CommandBuffer& cb = vcc.get_one_time_compute_buffer();
         path_tracer.create_tlas(cb);
         vcc.submit_compute(cb, true);
     }
@@ -112,7 +112,7 @@ namespace ve
         }
         vertex_buffer = storage.add_named_buffer(std::string("vertices"), vertices, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute);
         index_buffer = storage.add_named_buffer(std::string("indices"), indices, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute);
-        vk::CommandBuffer& cb = vcc.begin(vcc.compute_cb[0]);
+        vk::CommandBuffer& cb = vcc.get_one_time_compute_buffer();
         for (uint32_t i = 0; i < model_infos.size(); ++i)
         {
             ModelInfo& mi = model_infos[i];

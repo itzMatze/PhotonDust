@@ -49,7 +49,7 @@ namespace ve
         sci.imageColorSpace = surface_format.colorSpace;
         sci.imageExtent = extent;
         sci.imageArrayLayers = 1;
-        sci.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
+        sci.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
         sci.preTransform = capabilities.currentTransform;
         sci.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
         sci.presentMode = choose_present_mode();

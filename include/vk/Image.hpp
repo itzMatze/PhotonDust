@@ -23,7 +23,7 @@ namespace ve
         void create_sampler(vk::Filter filter = vk::Filter::eLinear, vk::SamplerAddressMode sampler_address_mode = vk::SamplerAddressMode::eRepeat, bool enable_anisotropy = true);
         void self_destruct();
         void transition_image_layout(VulkanCommandContext& vcc, vk::ImageLayout new_layout, vk::PipelineStageFlags src_stage_flags, vk::PipelineStageFlags dst_stage_flags, vk::AccessFlags src_access_flags, vk::AccessFlags dst_access_flags);
-        void save_to_file();
+        void save_to_file(VulkanCommandContext& vcc);
         vk::DeviceSize get_byte_size() const;
         uint32_t get_layer_count() const;
         vk::ImageLayout get_layout() const;

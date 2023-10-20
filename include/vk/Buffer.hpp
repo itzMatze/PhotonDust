@@ -69,7 +69,7 @@ namespace ve
                 memcpy(mapped_mem, data, byte_count);
                 vmaUnmapMemory(vmc.va, staging_vmaa);
 
-                vk::CommandBuffer& cb(vcc.begin(vcc.transfer_cb[0]));
+                vk::CommandBuffer& cb = vcc.get_one_time_transfer_buffer();
 
                 vk::BufferCopy copy_region{};
                 copy_region.srcOffset = 0;
@@ -115,7 +115,7 @@ namespace ve
             {
                 auto [staging_buffer, staging_vmaa] = create_buffer((vk::BufferUsageFlagBits::eTransferDst), VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, false, {vmc.queue_family_indices.transfer});
 
-                vk::CommandBuffer& cb(vcc.begin(vcc.transfer_cb[0]));
+                vk::CommandBuffer& cb = vcc.get_one_time_transfer_buffer();
                 vk::BufferCopy copy_region{};
                 copy_region.srcOffset = 0;
                 copy_region.dstOffset = 0;

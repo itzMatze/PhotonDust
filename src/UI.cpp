@@ -73,7 +73,7 @@ namespace ve
 
     void UI::upload_font_textures(VulkanCommandContext& vcc)
     {
-        vk::CommandBuffer cb = vcc.begin(vcc.graphics_cb[0]);
+        vk::CommandBuffer cb = vcc.get_one_time_graphics_buffer();
         ImGui_ImplVulkan_CreateFontsTexture(cb);
         vcc.submit_graphics(cb, true);
         ImGui_ImplVulkan_DestroyFontUploadObjects();

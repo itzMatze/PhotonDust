@@ -1,0 +1,160 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive: require
+#extension GL_EXT_ray_tracing : enable
+#extension GL_EXT_ray_query : enable
+
+#include "structs.glsl"
+
+#define PI 3.1415926535897932384626433832
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+struct CameraData
+{
+    vec3 pos;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    vec2 sensor_size;
+    float focal_length;
+};
+
+layout(binding = 0) uniform UniformBuffer
+{
+    CameraData camera_data;
+};
+layout(binding = 1) uniform accelerationStructureEXT topLevelAS;
+layout(binding = 2, rgba8) uniform restrict readonly image2D input_image;
+layout(binding = 3, rgba8) uniform restrict writeonly image2D output_image;
+layout(binding = 10) readonly buffer VertexBuffer
+{
+    AlignedVertex vertices[];
+};
+layout(binding = 11) readonly buffer IndexBuffer
+{
+    uint indices[];
+};
+layout(binding = 12) readonly buffer MaterialBuffer
+{
+    Material materials[];
+};
+layout(binding = 13) readonly buffer MeshRenderDataBuffer
+{
+    MeshRenderData mrd[];
+};
+layout(binding = 14) readonly buffer ModelMRDIndicesBuffer
+{
+    uint model_mrd_indices[];
+};
+layout(binding = 15) uniform sampler2DArray tex_sampler; // textures
+layout(binding = 16) readonly buffer LightBuffer
+{
+    Light lights[];
+};
+
+uint rng_state;
+
+uint PCGHashState()
+{
+    rng_state = rng_state * 747796405u + 2891336453u;
+    uint state = rng_state;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+uint PCGHash(uint seed)
+{
+    uint state = seed * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float pcg_random_state()
+{
+    return (float(PCGHashState()) / float(0xFFFFFFFFU));
+}
+
+float pcg_random_state_clipped_spatial()
+{
+    return cos(PI * PCGHashState()) * (((float(PCGHashState()) / float(0xFFFFFFFFU)) * 2.0) + 1.0);
+}
+
+float pcg_random(uint seed)
+{
+    return (float(PCGHash(seed)) / float(0xFFFFFFFFU));
+}
+
+bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out int geometry_idx, out int primitive_idx, out vec2 bary)
+{
+    rayQueryEXT rayQuery;
+    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsNoneEXT, 0xFF, ro, 0.01, rd, 10000.0);
+    rayQueryProceedEXT(rayQuery);
+    if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT)
+    {
+        t = rayQueryGetIntersectionTEXT(rayQuery, true);
+        instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
+        geometry_idx = rayQueryGetIntersectionGeometryIndexEXT(rayQuery, true);
+        primitive_idx = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
+        bary = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
+        return true;
+    }
+    return false;
+}
+
+vec4 get_color(uint mrd_idx, Vertex v)
+{
+    if (mrd[mrd_idx].mat_idx < 0) return v.color;
+    Material m = materials[mrd[mrd_idx].mat_idx];
+    if (length(m.emission) > 0.0)
+    {
+        return m.emission;
+    }
+    else if (m.base_texture >= 0)
+    {
+        return texture(tex_sampler, vec3(v.tex, materials[mrd[mrd_idx].mat_idx].base_texture));
+    }
+    else
+    {
+        return vec4(0.0, 0.5, 0.0, 1.0);
+    }
+}
+
+Vertex interpolate_attributes(uint mrd_idx, int primitive_idx, vec2 bary)
+{
+    Vertex v0 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3]]);
+    Vertex v1 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 1]]);
+    Vertex v2 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 2]]);
+    Vertex v;
+    v.normal = normalize((1.0 - bary.x - bary.y) * v0.normal + bary.x * v1.normal + bary.y * v2.normal);
+    v.color = (1.0 - bary.x - bary.y) * v0.color + bary.x * v1.color + bary.y * v2.color;
+    v.tex = (1.0 - bary.x - bary.y) * v0.tex + bary.x * v1.tex + bary.y * v2.tex;
+    return v;
+}
+
+void main()
+{
+    ivec2 viewport_size = imageSize(output_image);
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x > viewport_size.x || pixel.y > viewport_size.y) return;
+    vec2 norm_pixel = (vec2(pixel) / vec2(viewport_size) - 0.5) * camera_data.sensor_size;
+    vec3 p = camera_data.pos;
+    vec3 dir = normalize(-camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v);
+    vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
+    float t = 0.0;
+    int instance_id = 0;
+    int primitive_idx = 0;
+    int geometry_idx = 0;
+    vec2 bary = vec2(0.0);
+    if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
+    {
+        uint mrd_idx = model_mrd_indices[instance_id] + geometry_idx;
+        Vertex v = interpolate_attributes(mrd_idx, primitive_idx, bary);
+        out_color = get_color(mrd_idx, v);
+    }
+    else
+    {
+        out_color = vec4(0.0, 0.0, 0.5, 1.0);
+    }
+    imageStore(output_image, pixel, out_color);
+}

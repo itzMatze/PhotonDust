@@ -111,6 +111,45 @@ Vertex interpolate_attributes(uint mrd_idx, int primitive_idx, vec2 bary)
     return v;
 }
 
+vec2 concentric_sample_disk() {
+    vec2 u = vec2(pcg_random_state(), pcg_random_state());
+    vec2 u_offset = 2.0f * u - vec2(1, 1);
+    if (u_offset.x == 0 && u_offset.y == 0)
+        return vec2(0, 0);
+    float theta, r;
+    if (abs(u_offset.x) > abs(u_offset.y))
+    {
+        r = u_offset.x;
+        theta = PI / 4 * (u_offset.y / u_offset.x);
+    }
+    else
+    {
+        r = u_offset.y;
+        theta = PI / 2 - PI / 4 * (u_offset.x / u_offset.y);
+    }
+    return r * vec2(cos(theta), sin(theta));
+}
+
+vec3 cosine_sample_hemisphere(in vec3 n) {
+    vec2 d = concentric_sample_disk();
+    float z = sqrt(max(0, 1 - d.x * d.x - d.y * d.y));
+    vec3 v2, v3;
+    if (abs(n.x) > abs(n.y))
+    {
+        v2 = vec3(-n.z, 0, n.x) / sqrt(n.x * n.x + n.z * n.z);
+    }
+    else
+    {
+        v2 = vec3(0, n.z, -n.y) / sqrt(n.y * n.y + n.z * n.z);
+    }
+    v3 = cross(n, v2);
+    vec3 w = vec3(d.x, z, d.y);
+    w = w.y * n - w.x * v3 - w.z * v2;
+    return w;
+}
+
+#define PATH_LENGTH 8
+
 void main()
 {
     ivec2 viewport_size = imageSize(output_image);
@@ -122,23 +161,32 @@ void main()
     vec3 p = camera_data.pos;
     vec3 dir = normalize(-camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v);
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
+    vec4 attenuation = vec4(1.0, 1.0, 1.0, 1.0);
     uint wavelength = 380 + uint(pcg_random_state() * 400.0);
     float t = 0.0;
     int instance_id = 0;
     int primitive_idx = 0;
     int geometry_idx = 0;
     vec2 bary = vec2(0.0);
-    if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
+    Vertex v;
+    for (uint i = 0; i < PATH_LENGTH; ++i)
     {
-        uint mrd_idx = model_mrd_indices[instance_id] + geometry_idx;
-        Vertex v = interpolate_attributes(mrd_idx, primitive_idx, bary);
-        out_color = get_color(mrd_idx, v);
+        if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
+        {
+            uint mrd_idx = model_mrd_indices[instance_id] + geometry_idx;
+            v = interpolate_attributes(mrd_idx, primitive_idx, bary);
+            attenuation *= get_color(mrd_idx, v);
+            if (i > 0) attenuation / (1 + t);
+        }
+        else
+        {
+            out_color = vec4(1.0, 1.0, 1.0, 1.0);
+            break;
+        }
+        p = p + dir * t;
+        dir = cosine_sample_hemisphere(v.normal);
     }
-    else
-    {
-        out_color = vec4(0.0, 0.0, 0.5, 1.0);
-    }
-    out_color *= wavelength_to_rgba(wavelength);
+    out_color *= attenuation * wavelength_to_rgba(wavelength);
     if (pc.sample_count > 0)
     {
         out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);

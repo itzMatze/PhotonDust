@@ -28,8 +28,8 @@ namespace ve
         uint32_t get_layer_count() const;
         vk::ImageLayout get_layout() const;
         vk::Image& get_image();
-        vk::ImageView& get_view();
-        vk::Sampler& get_sampler();
+        vk::ImageView get_view() const;
+        vk::Sampler get_sampler() const;
 
     private:
         const VulkanMainContext& vmc;

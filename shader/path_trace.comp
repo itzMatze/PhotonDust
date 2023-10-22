@@ -10,6 +10,8 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
+layout(constant_id = 0) const uint TEXTURE_COUNT = 1;
+
 layout(push_constant) uniform PushConstant {
     PathTracerPushConstants pc;
 };
@@ -49,7 +51,7 @@ layout(binding = 14) readonly buffer ModelMRDIndicesBuffer
 {
     uint model_mrd_indices[];
 };
-layout(binding = 15) uniform sampler2DArray tex_sampler; // textures
+layout(binding = 15) uniform sampler2D tex_sampler[TEXTURE_COUNT];
 layout(binding = 16) readonly buffer LightBuffer
 {
     Light lights[];
@@ -79,13 +81,17 @@ vec4 get_color(uint mrd_idx, Vertex v)
 {
     if (mrd[mrd_idx].mat_idx < 0) return v.color;
     Material m = materials[mrd[mrd_idx].mat_idx];
-    if (length(m.emission) > 0.0)
+    if (m.base_texture >= 0)
+    {
+        return texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], v.tex);
+    }
+    else if (length(m.base_color) > 0.0)
+    {
+        return m.base_color;
+    }
+    else if (length(m.emission) > 0.0)
     {
         return m.emission;
-    }
-    else if (m.base_texture >= 0)
-    {
-        return texture(tex_sampler, vec3(v.tex, materials[mrd[mrd_idx].mat_idx].base_texture));
     }
     else
     {

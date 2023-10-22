@@ -4,7 +4,7 @@
 
 namespace ve
 {
-    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc, swapchain.get_render_pass(), frames_in_flight), render_pipeline(vmc), path_tracer_compute_pipeline(vmc), render_dsh(vmc), path_tracer_dsh(vmc)
+    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc, swapchain.get_render_pass(), frames_in_flight), render_pipeline(vmc), path_tracer_compute_pipeline(vmc), render_dsh(vmc, frames_in_flight), path_tracer_dsh(vmc, frames_in_flight)
     {
         vcc.add_graphics_buffers(frames_in_flight);
         vcc.add_compute_buffers(1);
@@ -68,6 +68,7 @@ namespace ve
         vmc.logical_device.get().waitIdle();
         path_tracer_compute_pipeline.self_destruct();
         create_path_tracer_pipeline();
+        ptpc.sample_count = 0;
     }
 
     void WorkContext::load_scene(const std::string& filename)
@@ -85,6 +86,7 @@ namespace ve
         spdlog::info("Loading scene took: {} ms", (timer.elapsed()));
         create_path_tracer_descriptor_set();
         create_path_tracer_pipeline();
+        ptpc.sample_count = 0;
     }
 
     void WorkContext::create_render_pipeline()
@@ -101,8 +103,7 @@ namespace ve
 
         for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
-            render_dsh.new_set();
-            render_dsh.add_descriptor(0, storage.get_image(render_textures[i]));
+            render_dsh.add_descriptor(i, 0, storage.get_image(render_textures[i]));
         }
         render_dsh.construct();
     }
@@ -110,7 +111,8 @@ namespace ve
     void WorkContext::create_path_tracer_pipeline()
     {
         std::array<vk::SpecializationMapEntry, 1> path_tracer_entries;
-        std::array<uint32_t, 1> path_tracer_entries_data{0};
+        path_tracer_entries[0] = vk::SpecializationMapEntry(0, 0, sizeof(uint32_t));
+        std::array<uint32_t, 1> path_tracer_entries_data{uint32_t(scene.get_texture_image_indices().size())};
         vk::SpecializationInfo path_tracer_spec_info(path_tracer_entries.size(), path_tracer_entries.data(), sizeof(uint32_t) * path_tracer_entries_data.size(), path_tracer_entries_data.data());
         ShaderInfo path_tracer_shader_info = ShaderInfo{"path_trace.comp", vk::ShaderStageFlagBits::eFragment, path_tracer_spec_info};
         path_tracer_compute_pipeline.construct(path_tracer_dsh.get_layouts()[0], path_tracer_shader_info, sizeof(PathTracerPushConstants));
@@ -118,6 +120,7 @@ namespace ve
 
     void WorkContext::create_path_tracer_descriptor_set()
     {
+        const std::vector<uint32_t>& texture_image_indices = scene.get_texture_image_indices();
         path_tracer_dsh.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(1, vk::DescriptorType::eAccelerationStructureKHR, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(2, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
@@ -129,24 +132,25 @@ namespace ve
         path_tracer_dsh.add_binding(12, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(13, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         path_tracer_dsh.add_binding(14, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
-        path_tracer_dsh.add_binding(15, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute);
+        if (texture_image_indices.size() > 0) path_tracer_dsh.add_binding(15, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute, texture_image_indices.size());
         path_tracer_dsh.add_binding(16, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
-            path_tracer_dsh.new_set();
-            path_tracer_dsh.add_descriptor(0, storage.get_buffer(uniform_buffer));
-            path_tracer_dsh.add_descriptor(1, storage.get_buffer_by_name("tlas"));
-            path_tracer_dsh.add_descriptor(2, storage.get_image(path_trace_images[i]));
-            path_tracer_dsh.add_descriptor(3, storage.get_image(path_trace_images[1 - i]));
-            path_tracer_dsh.add_descriptor(4, storage.get_buffer(path_trace_buffers[i]));
-            path_tracer_dsh.add_descriptor(5, storage.get_buffer(path_trace_buffers[1 - i]));
-            path_tracer_dsh.add_descriptor(10, storage.get_buffer_by_name("vertices"));
-            path_tracer_dsh.add_descriptor(11, storage.get_buffer_by_name("indices"));
-            path_tracer_dsh.add_descriptor(12, storage.get_buffer_by_name("materials"));
-            path_tracer_dsh.add_descriptor(13, storage.get_buffer_by_name("mesh_render_data"));
-            path_tracer_dsh.add_descriptor(14, storage.get_buffer_by_name("model_mrd_indices"));
-            path_tracer_dsh.add_descriptor(15, storage.get_image_by_name("textures"));
-            path_tracer_dsh.add_descriptor(16, storage.get_buffer_by_name("lights"));
+            path_tracer_dsh.add_descriptor(i, 0, storage.get_buffer(uniform_buffer));
+            path_tracer_dsh.add_descriptor(i, 1, storage.get_buffer_by_name("tlas"));
+            path_tracer_dsh.add_descriptor(i, 2, storage.get_image(path_trace_images[i]));
+            path_tracer_dsh.add_descriptor(i, 3, storage.get_image(path_trace_images[1 - i]));
+            path_tracer_dsh.add_descriptor(i, 4, storage.get_buffer(path_trace_buffers[i]));
+            path_tracer_dsh.add_descriptor(i, 5, storage.get_buffer(path_trace_buffers[1 - i]));
+            path_tracer_dsh.add_descriptor(i, 10, storage.get_buffer_by_name("vertices"));
+            path_tracer_dsh.add_descriptor(i, 11, storage.get_buffer_by_name("indices"));
+            path_tracer_dsh.add_descriptor(i, 12, storage.get_buffer_by_name("materials"));
+            path_tracer_dsh.add_descriptor(i, 13, storage.get_buffer_by_name("mesh_render_data"));
+            path_tracer_dsh.add_descriptor(i, 14, storage.get_buffer_by_name("model_mrd_indices"));
+            std::vector<Image> images;
+            for (uint32_t i : texture_image_indices) images.push_back(storage.get_image(i));
+            if (texture_image_indices.size() > 0) path_tracer_dsh.add_descriptor(i, 15, images);
+            path_tracer_dsh.add_descriptor(i, 16, storage.get_buffer_by_name("lights"));
         }
         path_tracer_dsh.construct();
     }

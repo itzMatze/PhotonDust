@@ -37,9 +37,20 @@ namespace ve
         std::vector<int32_t> texture_indices;
         std::vector<int32_t> material_indices;
 
-        Material& load_material(const VulkanMainContext& vmc, Storage& storage, int mat_idx, const tinygltf::Model& model, Model& model_data)
+        void reset()
+        {
+            total_index_count = 0;
+            total_vertex_count = 0;
+            total_material_count = 0;
+            total_texture_count = 0;
+            texture_indices.clear();
+            material_indices.clear();
+        }
+
+        void load_material(const VulkanMainContext& vmc, Storage& storage, int mat_idx, const tinygltf::Model& model, Model& model_data)
         {
             if (mat_idx < 0) VE_THROW("Trying to load material_idx < 0!");
+            if (material_indices[mat_idx] > -1) return;
             const tinygltf::Material& mat = model.materials[mat_idx];
 
             auto get_texture = [&](const std::string& name, uint32_t base_mip_level) -> int32_t {
@@ -48,8 +59,9 @@ namespace ve
                 int texture_idx = mat.values.at(name).TextureIndex();
                 if (texture_indices[texture_idx] > -1) return texture_indices[texture_idx];
                 const tinygltf::Texture& tex = model.textures[texture_idx];
-                texture_indices[texture_idx] = storage.add_image(model.images[tex.source].image.data(), model.images[tex.source].width, model.images[tex.source].height, true, base_mip_level, std::vector<uint32_t>{vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics}, vk::ImageUsageFlagBits::eSampled);
-                std::cout << model.images[tex.source].width << ";" << model.images[tex.source].height << std::endl;
+                model_data.texture_image_indices.push_back(storage.add_image(model.images[tex.source].image.data(), model.images[tex.source].width, model.images[tex.source].height, true, base_mip_level, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
+                texture_indices[texture_idx] = total_texture_count;
+                total_texture_count++;
                 return texture_indices[texture_idx];
             };
 
@@ -59,7 +71,8 @@ namespace ve
                 int texture_idx = mat.values.at(name).TextureIndex();
                 if (texture_indices[texture_idx] > -1) return texture_indices[texture_idx];
                 const tinygltf::Texture& tex = model.textures[texture_idx];
-                texture_indices[texture_idx] = images.size() + total_texture_count;
+                texture_indices[texture_idx] = total_texture_count;
+                total_texture_count++;
                 images.push_back(model.images[tex.source].image);
                 dimensions.width = model.images[tex.source].width;
                 dimensions.height = model.images[tex.source].height;
@@ -67,7 +80,7 @@ namespace ve
             };
 
             Material material{};
-            material.base_texture = get_array_layer_texture("baseColorTexture", model_data.texture_data, model_data.texture_dimensions);
+            material.base_texture = get_texture("baseColorTexture", 0);
             //material.metallic_roughness_texture = get_texture("metallicRoughnessTexture", 1);
             //material.normal_texture = get_texture("normalTexture", 1);
             //material.emissive_texture = get_texture("emissiveTexture", 1);
@@ -88,9 +101,9 @@ namespace ve
             {
                 material.emission = glm::vec4(glm::make_vec3(mat.additionalValues.at("emissiveFactor").ColorFactor().data()), 1.0);
             }
+            material_indices[mat_idx] = total_material_count;
+            total_material_count++;
             model_data.materials.push_back(material);
-            material_indices[mat_idx] = model_data.materials.size() + total_material_count - 1;
-            return model_data.materials.back();
         }
 
         void process_mesh(const VulkanMainContext& vmc, Storage& storage, const tinygltf::Mesh& mesh, const tinygltf::Model& model, const glm::mat4 matrix, Model& model_data)
@@ -185,7 +198,7 @@ namespace ve
                 }
                 if (primitive.material > -1)
                 {
-                    Material& mat = load_material(vmc, storage, primitive.material, model, model_data);
+                    load_material(vmc, storage, primitive.material, model, model_data);
                     model_data.meshes.push_back(Mesh(material_indices[primitive.material], total_index_count + idx_count, model_data.indices.size() - idx_count, mesh.name));
                 }
                 else
@@ -234,11 +247,8 @@ namespace ve
             }
         }
 
-        Model load(const VulkanMainContext& vmc, Storage& storage, const std::string& path, uint32_t idx_count, uint32_t vertex_count, uint32_t material_count, uint32_t texture_count)
+        Model load(const VulkanMainContext& vmc, Storage& storage, const std::string& path)
         {
-            total_index_count = idx_count;
-            total_vertex_count = vertex_count;
-            total_material_count = material_count;
             Model model_data{};
             spdlog::info("Loading glb: \"{}\"", path);
             tinygltf::TinyGLTF loader;
@@ -258,20 +268,15 @@ namespace ve
             {
                 process_node(vmc, storage, model.nodes[node_idx], model, glm::mat4(1.0f), model_data);
             }
-            for (const auto& i : texture_indices)
-            {
-                if (i > -1) model_data.texture_indices.push_back(i);
-            }
+            total_vertex_count += model_data.vertices.size();
+            total_index_count += model_data.indices.size();
             texture_indices.clear();
             material_indices.clear();
             return model_data;
         }
 
-        Model load(const VulkanMainContext& vmc, Storage& storage, const nlohmann::json& model, uint32_t idx_count, uint32_t vertex_count, uint32_t material_count)
+        Model load(const VulkanMainContext& vmc, Storage& storage, const nlohmann::json& model)
         {
-            total_index_count = idx_count;
-            total_vertex_count = vertex_count;
-            total_material_count = material_count;
             Model model_data{};
             // load custom directly in json defined models
             for (auto& v : model.at("vertices"))
@@ -293,23 +298,22 @@ namespace ve
                 Material m;
                 if (material_json.contains("base_texture"))
                 {
-                    texture_indices.emplace_back(storage.add_image(std::string("../assets/textures/") + std::string(model.value("base_texture", "")), true, 0, std::vector<uint32_t>{vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics}, vk::ImageUsageFlagBits::eSampled));
-                    m.base_texture = texture_indices.back();
+                    m.base_texture = total_texture_count;
+                    total_texture_count++;
+                    std::string filename(std::string("../assets/textures/") + std::string(material_json.value("base_texture", "")));
+                    model_data.texture_image_indices.push_back(storage.add_image(filename, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
                 }
                 model_data.materials.push_back(m);
-                material_indices.push_back(model_data.materials.size() + total_material_count - 1);
-                model_data.meshes.push_back(Mesh(material_indices.back(), total_index_count, model_data.indices.size(), "custom_model"));
-                for (const auto& i : texture_indices)
-                {
-                    if (i > -1) model_data.texture_indices.push_back(i);
-                }
-                texture_indices.clear();
+                model_data.meshes.push_back(Mesh(total_material_count, total_index_count, model_data.indices.size(), "custom_model"));
+                total_material_count++;
                 material_indices.clear();
             }
             else
             {
                 model_data.meshes.push_back(Mesh(-1, total_index_count, model_data.indices.size(), "custom_model"));
             }
+            total_vertex_count += model_data.vertices.size();
+            total_index_count += model_data.indices.size();
             return model_data;
         }
 

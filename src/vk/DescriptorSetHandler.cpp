@@ -2,86 +2,66 @@
 
 namespace ve
 {
-    DescriptorSetHandler::DescriptorSetHandler(const VulkanMainContext& vmc) : vmc(vmc)
+    DescriptorSetHandler::DescriptorSetHandler(const VulkanMainContext& vmc, uint32_t set_count) : vmc(vmc), set_count(set_count)
     {}
 
-    uint32_t DescriptorSetHandler::new_set()
+    void DescriptorSetHandler::add_binding(uint32_t binding, vk::DescriptorType type, vk::ShaderStageFlags stages, uint32_t descriptor_count)
     {
-        // add new descriptor set and apply current auto apply bindings
-        descriptor_sets.push_back({});
-        descriptor_sets.back().insert(descriptor_sets.back().end(), new_set_descriptors.begin(), new_set_descriptors.end());
-        return (descriptor_sets.size() - 1);
+        for (auto i = descriptors.begin(); i != descriptors.end(); ++i)
+        {
+            if (i->dslb.binding > binding)
+            {
+                descriptors.insert(i, Descriptor(binding, type, stages, descriptor_count, set_count));
+                return;
+            }
+        }
+        descriptors.push_back(Descriptor(binding, type, stages, descriptor_count, set_count));
     }
 
-    void DescriptorSetHandler::add_binding(uint32_t binding, vk::DescriptorType type, vk::ShaderStageFlags stages)
+    void DescriptorSetHandler::add_descriptor(uint32_t set, uint32_t binding, const std::vector<Buffer>& buffers)
     {
-        // add binding to build descriptor set layout
-        vk::DescriptorSetLayoutBinding dslb{};
-        dslb.binding = binding;
-        dslb.descriptorType = type;
-        dslb.descriptorCount = 1;
-        dslb.stageFlags = stages;
-        dslb.pImmutableSamplers = nullptr;
-        layout_bindings.push_back(dslb);
+        for (auto d = descriptors.begin(); d != descriptors.end(); ++d)
+        {
+            if (d->dslb.binding == binding)
+            {
+                for (const Buffer& b : buffers)
+                {
+                    d->dbi[set].push_back(vk::DescriptorBufferInfo(b.get(), 0, b.get_byte_size()));
+                    d->pNext[set] = b.pNext;
+                }
+            }
+        }
     }
 
-    void DescriptorSetHandler::add_descriptor(uint32_t binding, const Buffer& buffer)
+    void DescriptorSetHandler::add_descriptor(uint32_t set, uint32_t binding, const Buffer& buffer)
     {
-        // add buffer descriptor to current descriptor set
-        // every set needs to be build one after another
-        vk::DescriptorBufferInfo dbi{};
-        dbi.buffer = buffer.get();
-        dbi.offset = 0;
-        dbi.range = buffer.get_byte_size();
-        descriptor_sets.back().push_back(Descriptor(binding, dbi, {}, buffer.pNext));
+        add_descriptor(set, binding, std::vector<Buffer>{buffer});
     }
 
-    void DescriptorSetHandler::add_descriptor(uint32_t binding, Image& image)
+    void DescriptorSetHandler::add_descriptor(uint32_t set, uint32_t binding, const std::vector<Image>& images)
     {
-        // add image descriptor to current descriptor set
-        // every set needs to be build one after another
-        vk::DescriptorImageInfo dii{};
-        dii.imageLayout = image.get_layout();
-        dii.imageView = image.get_view();
-        dii.sampler = image.get_sampler();
-        descriptor_sets.back().push_back(Descriptor(binding, {}, dii, nullptr));
+        for (auto d = descriptors.begin(); d != descriptors.end(); ++d)
+        {
+            if (d->dslb.binding == binding)
+            {
+                for (const Image& i : images)
+                {
+                    d->dii[set].push_back(vk::DescriptorImageInfo(i.get_sampler(), i.get_view(), i.get_layout()));
+                }
+            }
+        }
     }
 
-    void DescriptorSetHandler::apply_descriptor_to_new_sets(uint32_t binding, const Buffer& buffer)
+    void DescriptorSetHandler::add_descriptor(uint32_t set, uint32_t binding, const Image& image)
     {
-        // add buffer descriptor to be added to every new descriptor set (used for e.g. uniform buffers)
-        vk::DescriptorBufferInfo dbi{};
-        dbi.buffer = buffer.get();
-        dbi.offset = 0;
-        dbi.range = buffer.get_byte_size();
-        new_set_descriptors.push_back(Descriptor(binding, dbi, {}, buffer.pNext));
-    }
-
-    void DescriptorSetHandler::apply_descriptor_to_new_sets(uint32_t binding, Image& image)
-    {
-        // add buffer descriptor to be added to every new descriptor set (used for e.g. uniform buffers)
-        vk::DescriptorImageInfo dii{};
-        dii.imageLayout = image.get_layout();
-        dii.imageView = image.get_view();
-        dii.sampler = image.get_sampler();
-        new_set_descriptors.push_back(Descriptor(binding, {}, dii, nullptr));
-    }
-
-    void DescriptorSetHandler::reset_auto_apply_bindings()
-    {
-        new_set_descriptors.clear();
+        add_descriptor(set, binding, std::vector<Image>{image});
     }
 
     void DescriptorSetHandler::construct()
     {
-        // sort with respect to binding that the layout and the descriptor sets are in the same order
-        std::sort(layout_bindings.begin(), layout_bindings.end());
-        for (auto& descriptors : descriptor_sets)
-        {
-            std::sort(descriptors.begin(), descriptors.end());
-        }
-
-        for (uint32_t i = 0; i < descriptor_sets.size(); ++i)
+        std::vector<vk::DescriptorSetLayoutBinding> layout_bindings;
+        for (const auto d : descriptors) layout_bindings.push_back(d.dslb);
+        for (uint32_t i = 0; i < set_count; ++i)
         {
             vk::DescriptorSetLayoutCreateInfo dslci{};
             dslci.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
@@ -91,11 +71,11 @@ namespace ve
         }
 
         std::vector<vk::DescriptorPoolSize> pool_sizes;
-        for (const auto& dslb : layout_bindings)
+        for (const auto d : descriptors)
         {
             vk::DescriptorPoolSize dps{};
-            dps.type = dslb.descriptorType;
-            dps.descriptorCount = descriptor_sets.size();
+            dps.type = d.dslb.descriptorType;
+            dps.descriptorCount = std::max(d.dbi.begin()->size(), d.dii.begin()->size());
             pool_sizes.push_back(dps);
         }
 
@@ -103,7 +83,7 @@ namespace ve
         dpci.sType = vk::StructureType::eDescriptorPoolCreateInfo;
         dpci.poolSizeCount = pool_sizes.size();
         dpci.pPoolSizes = pool_sizes.data();
-        dpci.maxSets = descriptor_sets.size();
+        dpci.maxSets = set_count;
 
         pool = vmc.logical_device.get().createDescriptorPool(dpci);
 
@@ -116,22 +96,22 @@ namespace ve
         sets = vmc.logical_device.get().allocateDescriptorSets(dsai);
 
         std::vector<vk::WriteDescriptorSet> wds_s;
-        for (uint32_t i = 0; i < descriptor_sets.size(); ++i)
+        for (uint32_t i = 0; i < set_count; ++i)
         {
-            for (uint32_t j = 0; j < descriptor_sets[i].size(); ++j)
+            for (uint32_t j = 0; j < descriptors.size(); ++j)
             {
                 vk::WriteDescriptorSet wds{};
-                wds.pNext = descriptor_sets[i][j].pNext;
+                wds.pNext = descriptors[j].pNext[i];
                 wds.sType = vk::StructureType::eWriteDescriptorSet;
                 wds.dstSet = sets[i];
-                wds.dstBinding = layout_bindings[j].binding;
+                wds.dstBinding = descriptors[j].dslb.binding;
                 wds.dstArrayElement = 0;
 
                 // descriptorType decides if descriptor is buffer or image, the unused one is empty
-                wds.descriptorType = layout_bindings[j].descriptorType;
-                wds.descriptorCount = 1;
-                wds.pBufferInfo = &(descriptor_sets[i][j].dbi);
-                wds.pImageInfo = &(descriptor_sets[i][j].dii);
+                wds.descriptorType = descriptors[j].dslb.descriptorType;
+                wds.pImageInfo = descriptors[j].dii[i].data();
+                wds.pBufferInfo = descriptors[j].dbi[i].data();
+                wds.descriptorCount = std::max(descriptors[j].dii[i].size(), descriptors[j].dbi[i].size());
                 wds.pTexelBufferView = nullptr;
 
                 wds_s.push_back(wds);
@@ -145,8 +125,7 @@ namespace ve
         for (auto& dsl : layouts) vmc.logical_device.get().destroyDescriptorSetLayout(dsl);
         layouts.clear();
         vmc.logical_device.get().destroyDescriptorPool(pool);
-        descriptor_sets.clear();
-        layout_bindings.clear();
+        descriptors.clear();
         sets.clear();
     }
 

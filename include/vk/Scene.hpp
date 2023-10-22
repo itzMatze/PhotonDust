@@ -14,6 +14,7 @@ namespace ve
         void construct();
         void self_destruct();
         void load(const std::string& path);
+        const std::vector<uint32_t>& get_texture_image_indices() const;
 
         bool loaded = false;
 
@@ -40,7 +41,7 @@ namespace ve
         uint32_t index_buffer;
         // use -1 to encode missing material buffer and/or textures as they are not required
         int32_t material_buffer = -1;
-        int32_t texture_image = -1;
+        std::vector<uint32_t> texture_image_indices;
         int32_t light_buffer = -1;
         uint32_t mesh_render_data_buffer;
         uint32_t model_mrd_indices_buffer;

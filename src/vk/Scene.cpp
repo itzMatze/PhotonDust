@@ -24,19 +24,19 @@ namespace ve
         storage.destroy_buffer(model_mrd_indices_buffer);
         storage.destroy_buffer(mesh_render_data_buffer);
         storage.destroy_buffer(light_buffer);
-        storage.destroy_image(texture_image);
         storage.destroy_buffer(material_buffer);
         storage.destroy_buffer(index_buffer);
         storage.destroy_buffer(vertex_buffer);
+        for (uint32_t i : texture_image_indices) storage.destroy_image(i);
+        texture_image_indices.clear();
         loaded = false;
     }
 
     void Scene::load(const std::string& path)
     {
+        ModelLoader::reset();
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
-        std::vector<std::vector<unsigned char>> texture_data;
-        vk::Extent2D texture_dimensions;
         std::vector<Material> materials;
         std::vector<MeshRenderData> mesh_render_data;
         std::vector<Light> lights;
@@ -51,12 +51,7 @@ namespace ve
             model_infos.back().num_indices = indices.size() - model_infos.back().index_buffer_idx;
             materials.insert(materials.end(), model.materials.begin(), model.materials.end());
             lights.insert(lights.end(), model.lights.begin(), model.lights.end());
-            texture_data.insert(texture_data.begin(), model.texture_data.begin(), model.texture_data.end());
-            if (!model.texture_data.empty())
-            {
-                VE_ASSERT(texture_dimensions == model.texture_dimensions || texture_dimensions == 0, "Textures have different dimensions!");
-                texture_dimensions = model.texture_dimensions;
-            }
+            texture_image_indices.insert(texture_image_indices.end(), model.texture_image_indices.begin(), model.texture_image_indices.end());
             model_infos.back().mesh_render_data_idx = mesh_render_data.size();
             for (Mesh& mesh : model.meshes)
             {
@@ -76,7 +71,7 @@ namespace ve
             for (const auto& d : data.at("model_files"))
             {
                 const std::string name = d.value("name", "");
-                Model model = ModelLoader::load(vmc, storage, std::string("../assets/models/") + std::string(d.value("file", "")), indices.size(), vertices.size(), materials.size(), texture_data.size());
+                Model model = ModelLoader::load(vmc, storage, std::string("../assets/models/") + std::string(d.value("file", "")));
 
                 // apply transformations to model
                 glm::mat4 transformation(1.0f);
@@ -106,7 +101,7 @@ namespace ve
             for (const auto& d : data["custom_models"])
             {
                 std::string name = d.value("name", "");
-                Model model = ModelLoader::load(vmc, storage, d, indices.size(), vertices.size(), materials.size());
+                Model model = ModelLoader::load(vmc, storage, d);
                 add_model(model, name, glm::mat4(1.0f));
             }
         }
@@ -125,14 +120,6 @@ namespace ve
         materials.clear();
         if (lights.empty()) lights.push_back(Light());
         light_buffer = storage.add_named_buffer(std::string("lights"), lights, vk::BufferUsageFlagBits::eStorageBuffer, false, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics);
-        if (texture_data.empty())
-        {
-            texture_dimensions.width = 1;
-            texture_dimensions.height = 1;
-            texture_data.push_back(std::vector<unsigned char>(4, 0));
-        }
-        texture_image = storage.add_named_image(std::string("textures"), texture_data, texture_dimensions.width, texture_dimensions.height, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled, vk::ImageViewType::e2DArray);
-        texture_data.clear();
         // delete vertices and indices on host
         indices.clear();
         vertices.clear();
@@ -141,6 +128,14 @@ namespace ve
         for (const auto& model : model_infos) model_mrd_indices.push_back(model.mesh_render_data_idx);
         model_mrd_indices_buffer = storage.add_named_buffer("model_mrd_indices", model_mrd_indices, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics);
 
+        std::vector<unsigned char> texture_data(4, 0);
+        texture_image_indices.push_back(storage.add_image(texture_data.data(), 1, 1, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
+
         loaded = true;
+    }
+
+    const std::vector<uint32_t>& Scene::get_texture_image_indices() const
+    {
+        return texture_image_indices;
     }
 } // namespace ve

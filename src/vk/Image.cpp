@@ -374,12 +374,12 @@ namespace ve
         return image;
     }
 
-    vk::ImageView& Image::get_view()
+    vk::ImageView Image::get_view() const
     {
         return view;
     }
 
-    vk::Sampler& Image::get_sampler()
+    vk::Sampler Image::get_sampler() const
     {
         return sampler;
     }

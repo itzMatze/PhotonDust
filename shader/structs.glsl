@@ -27,10 +27,10 @@ struct Material {
     float metallic;
     float roughness;
     int base_texture;
+    int emissive_texture;
     //int metallic_roughness_texture;
     //int normal_texture;
     //int occlusion_texture;
-    //int emissive_texture;
 };
 
 struct Light {

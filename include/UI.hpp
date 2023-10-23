@@ -22,9 +22,9 @@ namespace ve
         uint32_t total_frames = 0;
         bool load_scene = false;
         bool show_ui = true;
-        bool mesh_view = false;
+        bool attenuation_view = false;
+        bool emission_view = false;
         bool normal_view = false;
-        bool color_view = false;
         bool tex_view = false;
         bool save_screenshot = false;
         bool accumulate_samples = true;

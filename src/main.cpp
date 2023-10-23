@@ -117,20 +117,25 @@ private:
             app_state.show_ui = !app_state.show_ui;
             eh.set_released_key(Key::G, false);
         }
-        if (eh.is_key_released(Key::N))
+        if (eh.is_key_released(Key::H))
+        {
+            app_state.attenuation_view = !app_state.attenuation_view;
+            eh.set_released_key(Key::H, false);
+        }
+        if (eh.is_key_released(Key::J))
+        {
+            app_state.emission_view = !app_state.emission_view;
+            eh.set_released_key(Key::J, false);
+        }
+        if (eh.is_key_released(Key::K))
         {
             app_state.normal_view = !app_state.normal_view;
-            eh.set_released_key(Key::N, false);
+            eh.set_released_key(Key::K, false);
         }
-        if (eh.is_key_released(Key::T))
+        if (eh.is_key_released(Key::L))
         {
             app_state.tex_view = !app_state.tex_view;
-            eh.set_released_key(Key::T, false);
-        }
-        if (eh.is_key_released(Key::C))
-        {
-            app_state.color_view = !app_state.color_view;
-            eh.set_released_key(Key::C, false);
+            eh.set_released_key(Key::L, false);
         }
         if (eh.is_key_released(Key::F1))
         {

@@ -102,3 +102,14 @@ vec4 wavelength_to_rgba(uint wavelength)
     // divide by average response
     return vec4(xyz_to_rgb(cie_colour_match[(wavelength - 380) / 5]) * vec3(1.0f / 0.542192f, 1.0f / 0.275452f, 1.0f / 0.347872f), 1.0f);
 }
+
+uint get_random_wavelength(float random)
+{
+    return 380 + uint(pcg_random_state() * 80.999) * 5;
+}
+
+// uniform samples of wavelength -> every sample has the same probability
+float get_inv_wavelength_probability()
+{
+    return 80.0;
+}

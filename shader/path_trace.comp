@@ -77,25 +77,29 @@ bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out 
     return false;
 }
 
-vec4 get_color(uint mrd_idx, Vertex v)
+void apply_material_values(in uint mrd_idx, in Vertex v, inout vec4 emission, inout vec4 attenuation)
 {
-    if (mrd[mrd_idx].mat_idx < 0) return v.color;
+    if (mrd[mrd_idx].mat_idx < 0)
+    {
+        attenuation *= v.color;
+        return;
+    }
     Material m = materials[mrd[mrd_idx].mat_idx];
+    if (length(m.emission) > 0.0)
+    {
+        emission += attenuation * m.emission;
+    }
     if (m.base_texture >= 0)
     {
-        return texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], v.tex);
+        attenuation *= texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], v.tex);
     }
     else if (length(m.base_color) > 0.0)
     {
-        return m.base_color;
-    }
-    else if (length(m.emission) > 0.0)
-    {
-        return m.emission;
+        attenuation *= m.base_color;
     }
     else
     {
-        return vec4(0.0, 0.5, 0.0, 1.0);
+        attenuation = vec4(0.0, 0.0, 0.0, 0.0);
     }
 }
 
@@ -161,8 +165,9 @@ void main()
     vec3 p = camera_data.pos;
     vec3 dir = normalize(-camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v);
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
+    vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 attenuation = vec4(1.0, 1.0, 1.0, 1.0);
-    uint wavelength = 380 + uint(pcg_random_state() * 400.0);
+    uint wavelength = get_random_wavelength(pcg_random_state());
     float t = 0.0;
     int instance_id = 0;
     int primitive_idx = 0;
@@ -175,21 +180,31 @@ void main()
         {
             uint mrd_idx = model_mrd_indices[instance_id] + geometry_idx;
             v = interpolate_attributes(mrd_idx, primitive_idx, bary);
-            attenuation *= get_color(mrd_idx, v);
-            if (i > 0) attenuation / (1 + t);
+            apply_material_values(mrd_idx, v, emission, attenuation);
+            if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view) break;
         }
         else
         {
-            out_color = vec4(1.0, 1.0, 1.0, 1.0);
+            attenuation = vec4(0.0);
+            v.normal = vec3(0.0);
+            v.tex = vec2(0.0);
             break;
         }
         p = p + dir * t;
         dir = cosine_sample_hemisphere(v.normal);
     }
-    out_color *= attenuation * wavelength_to_rgba(wavelength);
-    if (pc.sample_count > 0)
+    if (pc.attenuation_view) out_color = attenuation;
+    else if (pc.emission_view) out_color = emission;
+    else if (pc.normal_view) out_color = vec4((v.normal + 1.0) / 2.0, 1.0);
+    else if (pc.tex_view) out_color = vec4(v.tex, 1.0, 1.0);
+    else
     {
-        out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);
+        // out_color is attenuated accumulated emission multiplied with spectral rgb response divided by probability of spectral sample
+        out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability();
+        if (pc.sample_count > 0)
+        {
+            out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);
+        }
     }
     output_pixel_data[pixel.y * viewport_size.x + pixel.x].col = out_color;
     imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), out_color);

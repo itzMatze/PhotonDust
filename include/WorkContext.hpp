@@ -50,6 +50,10 @@ namespace ve
         struct PathTracerPushConstants
         {
             uint32_t sample_count = 0;
+            uint32_t attenuation_view = 0;
+            uint32_t emission_view = 0;
+            uint32_t normal_view = 0;
+            uint32_t tex_view = 0;
         } ptpc;
 
         void create_render_pipeline();

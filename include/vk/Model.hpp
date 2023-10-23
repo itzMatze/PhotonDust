@@ -48,7 +48,7 @@ namespace ve
     namespace ModelLoader
     {
         void reset();
-        Model load(const VulkanMainContext& vmc, Storage& storage, const std::string& path);
         Model load(const VulkanMainContext& vmc, Storage& storage, const nlohmann::json& model);
+        Model load_custom(const VulkanMainContext& vmc, Storage& storage, const nlohmann::json& model);
     };
 } // namespace ve

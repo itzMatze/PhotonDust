@@ -170,6 +170,11 @@ namespace ve
             app_state.cam.data.v = app_state.cam.getUp();
             app_state.cam.data.w = app_state.cam.getFront();
             if (!app_state.force_accumulate_samples && (old_cam_data != app_state.cam.data || !app_state.accumulate_samples)) ptpc.sample_count = 0;
+            ptpc.attenuation_view = app_state.attenuation_view;
+            ptpc.emission_view = app_state.emission_view;
+            ptpc.normal_view = app_state.normal_view;
+            ptpc.tex_view = app_state.tex_view;
+            if ((ptpc.attenuation_view | ptpc.emission_view | ptpc.normal_view | ptpc.tex_view) != 0) ptpc.sample_count = 0;
             old_cam_data = app_state.cam.data;
             storage.get_buffer(uniform_buffer).update_data_bytes(&app_state.cam.data, sizeof(Camera::Data));
         }

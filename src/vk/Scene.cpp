@@ -71,7 +71,7 @@ namespace ve
             for (const auto& d : data.at("model_files"))
             {
                 const std::string name = d.value("name", "");
-                Model model = ModelLoader::load(vmc, storage, std::string("../assets/models/") + std::string(d.value("file", "")));
+                Model model = ModelLoader::load(vmc, storage, d);
 
                 // apply transformations to model
                 glm::mat4 transformation(1.0f);
@@ -101,7 +101,7 @@ namespace ve
             for (const auto& d : data["custom_models"])
             {
                 std::string name = d.value("name", "");
-                Model model = ModelLoader::load(vmc, storage, d);
+                Model model = ModelLoader::load_custom(vmc, storage, d);
                 add_model(model, name, glm::mat4(1.0f));
             }
         }

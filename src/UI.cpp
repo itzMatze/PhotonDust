@@ -103,6 +103,11 @@ namespace ve
         app_state.cam.data.sensor_size.y = app_state.cam.data.sensor_size.x / app_state.aspect_ratio;
         ImGui::DragFloat("Camera focal length", &app_state.cam.data.focal_length, 0.001f, 0.001f, 0.5f);
         ImGui::Separator();
+        ImGui::Checkbox("Attenuation view", &(app_state.attenuation_view));
+        ImGui::Checkbox("Emission view", &(app_state.emission_view));
+        ImGui::Checkbox("Normal view", &(app_state.normal_view));
+        ImGui::Checkbox("Texel view", &(app_state.tex_view));
+        ImGui::Separator();
         ImGui::Checkbox("Accumulate samples", &app_state.accumulate_samples);
         ImGui::Checkbox("Force accumulate samples", &app_state.force_accumulate_samples);
         ImGui::Text((std::string("VSync: ") + (app_state.vsync ? std::string("on") : std::string("off"))).c_str());

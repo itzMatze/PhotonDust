@@ -1,5 +1,9 @@
 struct PathTracerPushConstants {
     uint sample_count;
+    bool attenuation_view;
+    bool emission_view;
+    bool normal_view;
+    bool tex_view;
 };
 
 struct CameraData

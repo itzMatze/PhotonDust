@@ -7,6 +7,7 @@
 #include "structs.glsl"
 
 #define PI 3.1415926535897932384626433832
+#define INV_PI 0.3183098861837906715377675267
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
@@ -77,11 +78,24 @@ bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out 
     return false;
 }
 
-void apply_material_values(in uint mrd_idx, in Vertex v, inout vec4 emission, inout vec4 attenuation)
+float brdf_oren_nayar(in vec3 l, in vec3 n, in vec3 v, float r)
+{
+    float r2 = r * r;
+    float a = 1.0 - (r2 / (2.0 * r2 + 0.33));
+    float b = ((0.45 * r2) / (r2 + 0.09));
+    float ln = dot(l, n);
+    float vn = dot(v, n);
+    float ga = dot(normalize(v - n * vn), normalize(l - n * ln));
+    float theta_i = acos(vn);
+    float theta_o = acos(ln);
+	return INV_PI * (a + b * max(0.0, ga) * sin(max(theta_i, theta_o)) * tan(min(theta_i, theta_o)));
+}
+
+void apply_material_values(in uint mrd_idx, in Vertex vertex, in vec3 v, in vec3 l, inout vec4 emission, inout vec4 attenuation)
 {
     if (mrd[mrd_idx].mat_idx < 0)
     {
-        attenuation *= v.color;
+        attenuation *= brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color;
         return;
     }
     Material m = materials[mrd[mrd_idx].mat_idx];
@@ -91,7 +105,7 @@ void apply_material_values(in uint mrd_idx, in Vertex v, inout vec4 emission, in
     }
     if (m.base_texture >= 0)
     {
-        attenuation *= texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], v.tex);
+        attenuation *= texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], vertex.tex);
     }
     else if (length(m.base_color) > 0.0)
     {
@@ -101,6 +115,7 @@ void apply_material_values(in uint mrd_idx, in Vertex v, inout vec4 emission, in
     {
         attenuation = vec4(0.0, 0.0, 0.0, 0.0);
     }
+    attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness);
 }
 
 Vertex interpolate_attributes(uint mrd_idx, int primitive_idx, vec2 bary)
@@ -173,30 +188,31 @@ void main()
     int primitive_idx = 0;
     int geometry_idx = 0;
     vec2 bary = vec2(0.0);
-    Vertex v;
+    Vertex vertex;
     for (uint i = 0; i < PATH_LENGTH; ++i)
     {
         if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
         {
             uint mrd_idx = model_mrd_indices[instance_id] + geometry_idx;
-            v = interpolate_attributes(mrd_idx, primitive_idx, bary);
-            apply_material_values(mrd_idx, v, emission, attenuation);
+            vertex = interpolate_attributes(mrd_idx, primitive_idx, bary);
+            vec3 v = -dir;
+            p = p + dir * t;
+            dir = cosine_sample_hemisphere(vertex.normal);
+            apply_material_values(mrd_idx, vertex, v, dir, emission, attenuation);
             if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view) break;
         }
         else
         {
             attenuation = vec4(0.0);
-            v.normal = vec3(0.0);
-            v.tex = vec2(0.0);
+            vertex.normal = vec3(0.0);
+            vertex.tex = vec2(0.0);
             break;
         }
-        p = p + dir * t;
-        dir = cosine_sample_hemisphere(v.normal);
     }
     if (pc.attenuation_view) out_color = attenuation;
     else if (pc.emission_view) out_color = emission;
-    else if (pc.normal_view) out_color = vec4((v.normal + 1.0) / 2.0, 1.0);
-    else if (pc.tex_view) out_color = vec4(v.tex, 1.0, 1.0);
+    else if (pc.normal_view) out_color = vec4((vertex.normal + 1.0) / 2.0, 1.0);
+    else if (pc.tex_view) out_color = vec4(vertex.tex, 1.0, 1.0);
     else
     {
         // out_color is attenuated accumulated emission multiplied with spectral rgb response divided by probability of spectral sample

@@ -91,6 +91,7 @@ namespace ve
             ImGui::Text("Mouse_L || Arrow-Keys: panning");
             ImGui::Text("'+'-': change movement speed");
             ImGui::Text("'R': reload shaders");
+            ImGui::Text("'V': toggle VSync");
             ImGui::Text("'G': Show/Hide UI");
             ImGui::Text("'F1': Screenshot");
         }
@@ -104,6 +105,7 @@ namespace ve
         ImGui::Separator();
         ImGui::Checkbox("Accumulate samples", &app_state.accumulate_samples);
         ImGui::Checkbox("Force accumulate samples", &app_state.force_accumulate_samples);
+        ImGui::Text((std::string("VSync: ") + (app_state.vsync ? std::string("on") : std::string("off"))).c_str());
         time_diff = time_diff * (1 - update_weight) + app_state.time_diff * update_weight;
         frametime_values.push_back(app_state.time_diff);
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)
@@ -114,9 +116,9 @@ namespace ve
                 devicetiming_values[i].push_back(app_state.devicetimings[i]);
             }
         }
+        ImGui::Text((ve::to_string(time_diff * 1000, 4) + " ms; FPS: " + ve::to_string(1.0 / time_diff)).c_str());
         if (ImGui::CollapsingHeader("Timings"))
         {
-            ImGui::Text((ve::to_string(time_diff * 1000, 4) + " ms; FPS: " + ve::to_string(1.0 / time_diff)).c_str());
             ImGui::Text(("RENDERING_ALL: " + ve::to_string(devicetimings[DeviceTimer::RENDERING_ALL], 4) + " ms").c_str());
         }
         if (ImGui::CollapsingHeader("Plots"))

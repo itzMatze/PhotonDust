@@ -60,7 +60,7 @@ public:
             }
             catch (const vk::OutOfDateKHRError e)
             {
-                app_state.window_extent = wc.recreate_swapchain();
+                app_state.window_extent = wc.recreate_swapchain(app_state.vsync);
             }
             while (SDL_PollEvent(&e))
             {
@@ -141,6 +141,12 @@ private:
         {
             eh.set_released_key(Key::R, false);
             wc.reload_shaders();
+        }
+        if (eh.is_key_released(Key::V))
+        {
+            eh.set_released_key(Key::V, false);
+            app_state.vsync = !app_state.vsync;
+            wc.recreate_swapchain(app_state.vsync);
         }
         if (eh.is_key_pressed(Key::MouseLeft))
         {

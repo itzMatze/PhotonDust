@@ -26,7 +26,7 @@ namespace ve
         void reload_shaders();
         void load_scene(const std::string& filename);
         void draw_frame(AppState& app_state);
-        vk::Extent2D recreate_swapchain();
+        vk::Extent2D recreate_swapchain(bool vsync);
 
     private:
         const VulkanMainContext& vmc;

@@ -16,7 +16,7 @@ namespace ve
         const RenderPass& get_render_pass() const;
         vk::Extent2D get_extent() const;
         vk::Framebuffer get_framebuffer(uint32_t idx) const;
-        void construct();
+        void construct(bool vsync);
 
     private:
         const VulkanMainContext& vmc;
@@ -32,9 +32,9 @@ namespace ve
         std::vector<vk::ImageView> image_views;
         std::vector<vk::Framebuffer> framebuffers;
 
-        vk::SwapchainKHR create_swapchain();
+        vk::SwapchainKHR create_swapchain(bool vsync);
         void create_framebuffers();
-        vk::PresentModeKHR choose_present_mode();
+        vk::PresentModeKHR choose_present_mode(bool vsync);
         vk::Extent2D choose_extent();
         vk::SurfaceFormatKHR choose_surface_format();
         vk::Format choose_depth_format();

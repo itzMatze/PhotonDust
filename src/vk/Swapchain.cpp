@@ -27,16 +27,16 @@ namespace ve
         return framebuffers[idx];
     }
 
-    void Swapchain::construct()
+    void Swapchain::construct(bool vsync)
     {
         extent = choose_extent();
         surface_format = choose_surface_format();
-        swapchain = create_swapchain();
+        swapchain = create_swapchain(vsync);
         depth_buffer = storage.add_image(extent.width, extent.height, vk::ImageUsageFlagBits::eDepthStencilAttachment, depth_format, vk::SampleCountFlagBits::e1, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics});
         create_framebuffers();
     }
 
-    vk::SwapchainKHR Swapchain::create_swapchain()
+    vk::SwapchainKHR Swapchain::create_swapchain(bool vsync)
     {
         vk::SurfaceCapabilitiesKHR capabilities = vmc.get_surface_capabilities();
         uint32_t image_count = capabilities.maxImageCount > 0 ? std::min(capabilities.minImageCount + 1, capabilities.maxImageCount) : capabilities.minImageCount + 1;
@@ -52,7 +52,7 @@ namespace ve
         sci.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
         sci.preTransform = capabilities.currentTransform;
         sci.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        sci.presentMode = choose_present_mode();
+        sci.presentMode = choose_present_mode(vsync);
         sci.clipped = VK_TRUE;
         sci.oldSwapchain = VK_NULL_HANDLE;
         if (vmc.queue_family_indices.graphics != vmc.queue_family_indices.present)
@@ -124,12 +124,13 @@ namespace ve
         }
     }
 
-    vk::PresentModeKHR Swapchain::choose_present_mode()
+    vk::PresentModeKHR Swapchain::choose_present_mode(bool vsync)
     {
         std::vector<vk::PresentModeKHR> present_modes = vmc.get_surface_present_modes();
         for (const auto& pm : present_modes)
         {
-            if (pm == vk::PresentModeKHR::eImmediate) return pm;
+            if (vsync && pm == vk::PresentModeKHR::eFifo) return pm;
+            if (!vsync && pm == vk::PresentModeKHR::eImmediate) return pm;
         }
         spdlog::warn("Desired present mode not found. Using FIFO.");
         return vk::PresentModeKHR::eFifo;

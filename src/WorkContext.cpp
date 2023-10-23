@@ -15,7 +15,7 @@ namespace ve
             timers.emplace_back(vmc);
             syncs.emplace_back(vmc.logical_device.get());
         }
-        swapchain.construct();
+        swapchain.construct(app_state.vsync);
         app_state.window_extent = swapchain.get_extent();
         // set up images for path tracing
         std::vector<unsigned char> initial_image(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
@@ -189,11 +189,11 @@ namespace ve
         app_state.total_frames++;
     }
 
-    vk::Extent2D WorkContext::recreate_swapchain()
+    vk::Extent2D WorkContext::recreate_swapchain(bool vsync)
     {
         vmc.logical_device.get().waitIdle();
         swapchain.self_destruct(false);
-        swapchain.construct();
+        swapchain.construct(vsync);
         render_pipeline.self_destruct();
         path_tracer_compute_pipeline.self_destruct();
         create_render_pipeline();

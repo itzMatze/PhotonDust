@@ -29,6 +29,7 @@ namespace ve
         bool save_screenshot = false;
         bool accumulate_samples = true;
         bool force_accumulate_samples = false;
+        bool vsync = true;
     };
 
     class UI

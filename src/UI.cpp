@@ -111,6 +111,7 @@ namespace ve
         ImGui::Checkbox("Accumulate samples", &app_state.accumulate_samples);
         ImGui::Checkbox("Force accumulate samples", &app_state.force_accumulate_samples);
         ImGui::Text((std::string("VSync: ") + (app_state.vsync ? std::string("on") : std::string("off"))).c_str());
+        ImGui::Text((std::string("Sample count: ") + std::to_string(app_state.sample_count)).c_str());
         time_diff = time_diff * (1 - update_weight) + app_state.time_diff * update_weight;
         frametime_values.push_back(app_state.time_diff);
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)

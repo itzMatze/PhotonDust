@@ -73,6 +73,7 @@ public:
             {
                 app_state.load_scene = false;
                 wc.load_scene(app_state.scene_names[app_state.current_scene]);
+                app_state.sample_count = 0;
                 timer.restart();
             }
         }
@@ -146,6 +147,7 @@ private:
         {
             eh.set_released_key(Key::R, false);
             wc.reload_shaders();
+            app_state.sample_count = 0;
         }
         if (eh.is_key_released(Key::V))
         {

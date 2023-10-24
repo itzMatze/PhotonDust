@@ -20,6 +20,7 @@ namespace ve
         int32_t current_scene = 0;
         uint32_t current_frame = 0;
         uint32_t total_frames = 0;
+        uint32_t sample_count = 0;
         bool load_scene = false;
         bool show_ui = true;
         bool attenuation_view = false;

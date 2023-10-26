@@ -4,6 +4,7 @@
 
 #include "vk/common.hpp"
 #include "ve_log.hpp"
+#include "vk/VulkanCommandContext.hpp"
 #include "vk/VulkanMainContext.hpp"
 
 namespace ve
@@ -43,8 +44,9 @@ namespace ve
             TIMER_COUNT
         };
 
-        DeviceTimer(const VulkanMainContext& vmc);
+        DeviceTimer(const VulkanMainContext& vmc, VulkanCommandContext& vcc);
         void self_destruct();
+        void reset_all(vk::CommandBuffer& cb);
         void reset(vk::CommandBuffer& cb, const std::vector<TimerNames>& timers);
         void start(vk::CommandBuffer& cb, TimerNames t, vk::PipelineStageFlagBits stage);
         void stop(vk::CommandBuffer& cb, TimerNames t, vk::PipelineStageFlagBits stage);

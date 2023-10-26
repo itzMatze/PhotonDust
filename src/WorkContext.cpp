@@ -12,7 +12,7 @@ namespace ve
         ui.upload_font_textures(vcc);
         for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
-            timers.emplace_back(vmc);
+            timers.emplace_back(vmc, vcc);
             syncs.emplace_back(vmc.logical_device.get());
         }
         swapchain.construct(app_state.vsync);

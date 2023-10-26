@@ -5,7 +5,14 @@
             "file": "cube.glb",
             "scale": [1.0, 1.0, 1.0],
             "translation": [0.0, 1.0, 0.0],
-            "rotation": [0, 0.0, 1.0, 0.0]
+            "rotation": [0, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 1.0, 1.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0],
+                "roughness": 0.1,
+                "metallic": 0.8
+            }
         },
         {
             "name": "cube_light_0",
@@ -15,7 +22,7 @@
             "rotation": [0, 0.0, 1.0, 0.0],
             "material":
             {
-                "base_color": [1.0, 0.0, 0.0, 1.0],
+                "base_color": [0.0, 0.0, 0.0, 0.0],
                 "emission": [1.0, 0.0, 0.0, 1.0]
             }
         },
@@ -27,7 +34,7 @@
             "rotation": [0, 0.0, 1.0, 0.0],
             "material":
             {
-                "base_color": [0.0, 0.0, 1.0, 1.0],
+                "base_color": [0.0, 0.0, 0.0, 0.0],
                 "emission": [0.0, 0.0, 1.0, 1.0]
             }
         }

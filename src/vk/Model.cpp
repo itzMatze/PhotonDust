@@ -258,14 +258,10 @@ namespace ve
                 std::string filename(std::string("../assets/textures/") + std::string(material_json.value("base_texture", "")));
                 model_data.texture_image_indices.push_back(storage.add_image(filename, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
             }
-            if (material_json.contains("emission"))
-            {
-                m.emission = glm::vec4(material_json.at("emission")[0], material_json.at("emission")[1], material_json.at("emission")[2], material_json.at("emission")[3]);
-            }
-            if (material_json.contains("base_color"))
-            {
-                m.base_color = glm::vec4(material_json.at("base_color")[0], material_json.at("base_color")[1], material_json.at("base_color")[2], material_json.at("base_color")[3]);
-            }
+            if (material_json.contains("emission")) m.emission = glm::vec4(material_json.at("emission")[0], material_json.at("emission")[1], material_json.at("emission")[2], material_json.at("emission")[3]);
+            if (material_json.contains("base_color")) m.base_color = glm::vec4(material_json.at("base_color")[0], material_json.at("base_color")[1], material_json.at("base_color")[2], material_json.at("base_color")[3]);
+            if (material_json.contains("roughness")) m.roughness = material_json.at("roughness");
+            if (material_json.contains("metallic")) m.metallic = material_json.at("metallic");
             model_data.materials.push_back(m);
             total_material_count++;
             return total_material_count - 1;
@@ -285,16 +281,13 @@ namespace ve
             if (!err.empty()) VE_THROW(err);
 
             texture_indices.resize(model.textures.size(), -1);
+            int mat_idx = -1;
             if (json_model.contains("material"))
             {
                 // override all material indices with the material from the json file
-                material_indices.resize(model.materials.size(), load_json_material(vmc, storage, json_model, model_data));
+                mat_idx = load_json_material(vmc, storage, json_model, model_data);
             }
-            else
-            {
-                // mark all materials as not loaded
-                material_indices.resize(model.materials.size(), -1);
-            }
+            material_indices.resize(model.materials.size(), mat_idx);
 
             const tinygltf::Scene& scene = model.scenes[model.defaultScene > -1 ? model.defaultScene : 0];
             // traverse scene nodes
@@ -306,6 +299,10 @@ namespace ve
             total_index_count += model_data.indices.size();
             texture_indices.clear();
             material_indices.clear();
+            if (model.materials.size() == 0)
+            {
+                for (auto& m : model_data.meshes) m.material_idx = mat_idx;
+            }
             return model_data;
         }
 

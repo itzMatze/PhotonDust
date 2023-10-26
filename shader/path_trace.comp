@@ -8,6 +8,7 @@
 
 #define PI 3.1415926535897932384626433832
 #define INV_PI 0.3183098861837906715377675267
+#define EPS 0.1e-8
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
@@ -78,58 +79,6 @@ bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out 
     return false;
 }
 
-float brdf_oren_nayar(in vec3 l, in vec3 n, in vec3 v, float r)
-{
-    float r2 = r * r;
-    float a = 1.0 - (r2 / (2.0 * r2 + 0.33));
-    float b = ((0.45 * r2) / (r2 + 0.09));
-    float ln = dot(l, n);
-    float vn = dot(v, n);
-    float ga = dot(normalize(v - n * vn), normalize(l - n * ln));
-    float theta_i = acos(vn);
-    float theta_o = acos(ln);
-	return INV_PI * (a + b * max(0.0, ga) * sin(max(theta_i, theta_o)) * tan(min(theta_i, theta_o)));
-}
-
-void apply_material_values(in uint mrd_idx, in Vertex vertex, in vec3 v, in vec3 l, inout vec4 emission, inout vec4 attenuation)
-{
-    if (mrd[mrd_idx].mat_idx < 0)
-    {
-        attenuation *= brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color;
-        return;
-    }
-    Material m = materials[mrd[mrd_idx].mat_idx];
-    if (length(m.emission) > 0.0)
-    {
-        emission += attenuation * m.emission;
-    }
-    if (m.base_texture >= 0)
-    {
-        attenuation *= texture(tex_sampler[materials[mrd[mrd_idx].mat_idx].base_texture], vertex.tex);
-    }
-    else if (length(m.base_color) > 0.0)
-    {
-        attenuation *= m.base_color;
-    }
-    else
-    {
-        attenuation = vec4(0.0, 0.0, 0.0, 0.0);
-    }
-    attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness);
-}
-
-Vertex interpolate_attributes(uint mrd_idx, int primitive_idx, vec2 bary)
-{
-    Vertex v0 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3]]);
-    Vertex v1 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 1]]);
-    Vertex v2 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 2]]);
-    Vertex v;
-    v.normal = normalize((1.0 - bary.x - bary.y) * v0.normal + bary.x * v1.normal + bary.y * v2.normal);
-    v.color = (1.0 - bary.x - bary.y) * v0.color + bary.x * v1.color + bary.y * v2.color;
-    v.tex = (1.0 - bary.x - bary.y) * v0.tex + bary.x * v1.tex + bary.y * v2.tex;
-    return v;
-}
-
 vec2 concentric_sample_disk() {
     vec2 u = vec2(pcg_random_state(), pcg_random_state());
     vec2 u_offset = 2.0f * u - vec2(1, 1);
@@ -165,6 +114,88 @@ vec3 cosine_sample_hemisphere(in vec3 n) {
     vec3 w = vec3(d.x, z, d.y);
     w = w.y * n - w.x * v3 - w.z * v2;
     return w;
+}
+
+float brdf_oren_nayar(in vec3 l, in vec3 n, in vec3 v, float r)
+{
+    float r2 = r * r;
+    float a = 1.0 - (r2 / (2.0 * r2 + 0.33));
+    float b = ((0.45 * r2) / (r2 + 0.09));
+    float nl = dot(l, n);
+    float nv = dot(v, n);
+    float ga = dot(normalize(v - n * nv), normalize(l - n * nl));
+    float theta_i = acos(nv);
+    float theta_o = acos(nl);
+    return INV_PI * (a + b * max(ga, 0.0) * sin(max(theta_i, theta_o)) * tan(min(theta_i, theta_o)));
+}
+
+float ndf_ggx(in float nh, in float r)
+{
+    float r2 = r * r;
+    float denom = (nh * nh * (r2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    return r2 / max(denom, EPS);
+}
+
+float geometry_smith_ggx(in float nl, in float nv, in float r)
+{
+    float r2 = r * r;
+    float gv = nl * sqrt(nv * (nv - nv * r2) + r2);
+    float gl = nv * sqrt(nl * (nl - nl * r2) + r2);
+    return 0.5 / max(gv + gl, EPS);
+}
+
+vec3 fresnel_schlick(in float vh, in vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(1.0 - vh, 5.0);
+}
+
+vec4 brdf_cook_torrance(in vec3 l, in vec3 n, in vec3 v, in vec3 albedo, in float metallic, in float r)
+{
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, albedo, metallic);
+    vec3 h = normalize(v + l);
+    float nh = max(dot(n, h), 0.0);
+    float nv = max(dot(n, v), 0.0);
+    float nl = max(dot(n, l), 0.0);
+    float vh = max(dot(v, h), 0.0);
+
+    float N = ndf_ggx(nh, r);
+    float D = geometry_smith_ggx(nl, nv, r);
+    vec3 F = fresnel_schlick(vh, F0);
+    vec3 specular = (N * D * F) / max((4.0 * nv * nl), EPS);
+    return vec4((1 - metallic) * (brdf_oren_nayar(l, n, v, r) * albedo + F) + (metallic) * specular, 1.0);
+}
+
+void apply_material_values(in uint mrd_idx, in Vertex vertex, in vec3 v, inout vec3 l, inout vec4 emission, inout vec4 attenuation)
+{
+    // object does not have material, make it fully diffuse with the vertex color
+    if (mrd[mrd_idx].mat_idx < 0)
+    {
+        attenuation *= brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color;
+        return;
+    }
+    Material m = materials[mrd[mrd_idx].mat_idx];
+    // add attenuated emission of material
+    if (length(m.emission) > 0.0) emission += attenuation * m.emission;
+    // get color of material at position
+    vec4 color = vec4(0.0);
+    if (m.base_texture >= 0) color = texture(tex_sampler[m.base_texture], vertex.tex);
+    else if (length(m.base_color) > 0.0) color = m.base_color;
+    else color = vec4(0.0, 0.0, 0.0, 0.0);
+    attenuation *= brdf_cook_torrance(l, vertex.normal, v, color.rgb, m.metallic, m.roughness);
+}
+
+Vertex interpolate_attributes(uint mrd_idx, int primitive_idx, vec2 bary)
+{
+    Vertex v0 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3]]);
+    Vertex v1 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 1]]);
+    Vertex v2 = unpack_vertex(vertices[indices[mrd[mrd_idx].indices_idx + primitive_idx * 3 + 2]]);
+    Vertex v;
+    v.normal = normalize((1.0 - bary.x - bary.y) * v0.normal + bary.x * v1.normal + bary.y * v2.normal);
+    v.color = (1.0 - bary.x - bary.y) * v0.color + bary.x * v1.color + bary.y * v2.color;
+    v.tex = (1.0 - bary.x - bary.y) * v0.tex + bary.x * v1.tex + bary.y * v2.tex;
+    return v;
 }
 
 #define PATH_LENGTH 8
@@ -219,6 +250,7 @@ void main()
         out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability();
         if (pc.sample_count > 0)
         {
+            // interpolate with previous samples
             out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);
         }
     }

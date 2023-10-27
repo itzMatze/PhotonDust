@@ -9,6 +9,7 @@
 #define PI 3.1415926535897932384626433832
 #define INV_PI 0.3183098861837906715377675267
 #define EPS 0.1e-10
+#define INV_GAMMA 0.454545454545
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
@@ -290,5 +291,5 @@ void main()
         }
     }
     output_pixel_data[pixel.y * viewport_size.x + pixel.x].col = out_color;
-    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), out_color);
+    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color, vec4(INV_GAMMA)));
 }

@@ -23,7 +23,8 @@
             "material":
             {
                 "base_color": [0.0, 0.0, 0.0, 0.0],
-                "emission": [1.0, 0.0, 0.0, 1.0]
+                "emission": [1.0, 0.0, 0.0, 1.0],
+                "emission_strength": 0.5
             }
         },
         {

@@ -201,7 +201,7 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
     }
     Material m = materials[mrd.mat_idx];
     // add attenuated emission of material
-    if (length(m.emission) > 0.0) emission += attenuation * m.emission;
+    if (length(m.emission) > 0.0) emission += attenuation * m.emission * m.emission_strength;
     // get color of material at position
     vec4 color = vec4(0.0);
     if (m.base_texture >= 0) color = texture(tex_sampler[m.base_texture], vertex.tex);

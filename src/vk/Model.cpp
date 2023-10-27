@@ -101,6 +101,10 @@ namespace ve
             {
                 material.emission = glm::vec4(glm::make_vec3(mat.additionalValues.at("emissiveFactor").ColorFactor().data()), 1.0);
             }
+            if (mat.extensions.find("KHR_materials_emissive_strength") != mat.extensions.end())
+            {
+                material.emission_strength = mat.extensions.at("KHR_materials_emissive_strength").Get("emissiveStrength").GetNumberAsDouble();
+            }
             material_indices[mat_idx] = total_material_count;
             total_material_count++;
             model_data.materials.push_back(material);
@@ -259,6 +263,7 @@ namespace ve
                 model_data.texture_image_indices.push_back(storage.add_image(filename, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
             }
             if (material_json.contains("emission")) m.emission = glm::vec4(material_json.at("emission")[0], material_json.at("emission")[1], material_json.at("emission")[2], material_json.at("emission")[3]);
+            if (material_json.contains("emission_strength")) m.emission_strength = material_json.at("emission_strength");
             if (material_json.contains("base_color")) m.base_color = glm::vec4(material_json.at("base_color")[0], material_json.at("base_color")[1], material_json.at("base_color")[2], material_json.at("base_color")[3]);
             if (material_json.contains("roughness")) m.roughness = material_json.at("roughness");
             if (material_json.contains("metallic")) m.metallic = material_json.at("metallic");

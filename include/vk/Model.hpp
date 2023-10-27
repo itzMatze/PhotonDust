@@ -15,10 +15,11 @@ namespace ve
     struct Material {
         glm::vec4 base_color = glm::vec4(1.0f);
         glm::vec4 emission = glm::vec4(0.0f);
+        float emission_strength = 1.0f;
         float metallic = 0.0f;
-        float roughness = 0.0f;
+        float roughness = 1.0f;
         int32_t base_texture = -1;
-        int32_t emissive_texture = -1;
+        //int32_t emissive_texture = -1;
         //int32_t metallic_roughness_texture = -1;
         //int32_t normal_texture = -1;
         //int32_t occlusion_texture = -1;

@@ -28,10 +28,11 @@ struct MeshRenderData {
 struct Material {
     vec4 base_color;
     vec4 emission;
+    float emission_strength;
     float metallic;
     float roughness;
     int base_texture;
-    int emissive_texture;
+    //int emissive_texture;
     //int metallic_roughness_texture;
     //int normal_texture;
     //int occlusion_texture;

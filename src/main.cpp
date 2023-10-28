@@ -155,6 +155,61 @@ private:
             app_state.vsync = !app_state.vsync;
             wc.recreate_swapchain(app_state.vsync);
         }
+        if (eh.is_key_released(Key::One))
+        {
+            eh.set_released_key(Key::One, false);
+            app_state.current_scene = 0;
+        }
+        if (eh.is_key_released(Key::Two))
+        {
+            eh.set_released_key(Key::Two, false);
+            app_state.current_scene = 1;
+        }
+        if (eh.is_key_released(Key::Three))
+        {
+            eh.set_released_key(Key::Three, false);
+            app_state.current_scene = 2;
+        }
+        if (eh.is_key_released(Key::Four))
+        {
+            eh.set_released_key(Key::Four, false);
+            app_state.current_scene = 3;
+        }
+        if (eh.is_key_released(Key::Five))
+        {
+            eh.set_released_key(Key::Five, false);
+            app_state.current_scene = 4;
+        }
+        if (eh.is_key_released(Key::Six))
+        {
+            eh.set_released_key(Key::Six, false);
+            app_state.current_scene = 5;
+        }
+        if (eh.is_key_released(Key::Seven))
+        {
+            eh.set_released_key(Key::Seven, false);
+            app_state.current_scene = 6;
+        }
+        if (eh.is_key_released(Key::Eight))
+        {
+            eh.set_released_key(Key::Eight, false);
+            app_state.current_scene = 7;
+        }
+        if (eh.is_key_released(Key::Nine))
+        {
+            eh.set_released_key(Key::Nine, false);
+            app_state.current_scene = 8;
+        }
+        if (eh.is_key_released(Key::Zero))
+        {
+            eh.set_released_key(Key::Zero, false);
+            app_state.current_scene = 9;
+        }
+        if (eh.is_key_released(Key::Return))
+        {
+            eh.set_released_key(Key::Return, false);
+            app_state.load_scene = true;
+        }
         if (eh.is_key_pressed(Key::MouseLeft))
         {
             if (!SDL_GetRelativeMouseMode()) SDL_SetRelativeMouseMode(SDL_TRUE);

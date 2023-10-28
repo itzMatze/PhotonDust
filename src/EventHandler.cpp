@@ -158,6 +158,39 @@ void EventHandler::dispatch_event(SDL_Event e)
         case SDLK_F1:
             apply_key_event(Key::F1, e.type);
             break;
+        case SDLK_0:
+            apply_key_event(Key::Zero, e.type);
+            break;
+        case SDLK_1:
+            apply_key_event(Key::One, e.type);
+            break;
+        case SDLK_2:
+            apply_key_event(Key::Two, e.type);
+            break;
+        case SDLK_3:
+            apply_key_event(Key::Three, e.type);
+            break;
+        case SDLK_4:
+            apply_key_event(Key::Four, e.type);
+            break;
+        case SDLK_5:
+            apply_key_event(Key::Five, e.type);
+            break;
+        case SDLK_6:
+            apply_key_event(Key::Six, e.type);
+            break;
+        case SDLK_7:
+            apply_key_event(Key::Seven, e.type);
+            break;
+        case SDLK_8:
+            apply_key_event(Key::Eight, e.type);
+            break;
+        case SDLK_9:
+            apply_key_event(Key::Nine, e.type);
+            break;
+        case SDLK_RETURN:
+            apply_key_event(Key::Return, e.type);
+            break;
     }
 }
 

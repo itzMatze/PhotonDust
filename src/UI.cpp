@@ -101,7 +101,7 @@ namespace ve
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Scene");
         ImGui::Combo("Scene", &app_state.current_scene, app_state.scene_names.data(), app_state.scene_names.size());
-        app_state.load_scene = ImGui::Button("Load scene");
+        app_state.load_scene |= ImGui::Button("Load scene");
         // camera
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Camera");
@@ -115,9 +115,9 @@ namespace ve
             ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_Outside | ImPlotLegendFlags_Horizontal);
             // set y-axis maximum with maximum histogram value, excluding 0 and maximum brightness
             uint32_t max = 0;
-            for (uint32_t i = 0; i < app_state.histogram.size(); ++i)
+            for (uint32_t i = 1; i < app_state.histogram.size() - 1; ++i)
             {
-                if (i % app_state.bin_count_per_channel != 0 && i % (app_state.bin_count_per_channel - 1) != 0 && app_state.histogram[i] > max) max = app_state.histogram[i];
+                if (i % app_state.bin_count_per_channel != 0 && (i + 1) % app_state.bin_count_per_channel != 0 && app_state.histogram[i] > max) max = app_state.histogram[i];
             }
             ImPlot::SetupAxesLimits(0.0, 1.0, 0.0, max, ImPlotCond_Always);
             ImPlot::SetupAxes("Brightness", "Count", ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines);

@@ -245,7 +245,8 @@ void main()
     vec2 jitter = vec2(pcg_random_state(), pcg_random_state()) - 0.5;
     vec2 norm_pixel = ((vec2(pixel) + jitter) / vec2(viewport_size) - 0.5) * camera_data.sensor_size;
     vec3 p = camera_data.pos;
-    vec3 dir = normalize(-camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v);
+    vec3 pixel_pos = -camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v + p;
+    vec3 dir = normalize(pixel_pos - p);
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 attenuation = vec4(1.0, 1.0, 1.0, 1.0);
@@ -283,7 +284,8 @@ void main()
     else
     {
         // out_color is attenuated accumulated emission multiplied with spectral rgb response divided by probability of spectral sample
-        out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability();
+        // also divide by probability of sampled pixel, given by the geometry term and surface of sensor, cosine of outgoing direction and at sensor are the same
+        out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability() * ((pow(dot(normalize(pixel_pos - camera_data.pos), -camera_data.w), 2) * (camera_data.sensor_size.x * camera_data.sensor_size.y)) / pow(length(pixel_pos - camera_data.pos), 2));
         if (pc.sample_count > 0)
         {
             // interpolate with previous samples

@@ -9,9 +9,8 @@ class Camera
 {
 public:
     Camera(float fov, float aspect_ratio);
-    void updateVP(float time_diff);
-    glm::mat4 getV();
-    glm::mat4 getVP();
+    void update_data();
+    void update(float time_diff);
     void translate(glm::vec3 v);
     void onMouseMove(float xRel, float yRel);
     void moveFront(float amount);
@@ -50,9 +49,6 @@ public:
 private:
     glm::vec3 position;
     glm::quat orientation;
-    glm::mat4 projection;
-    glm::mat4 view;
-    glm::mat4 vp;
     glm::vec3 u, v, w;
     float near, far;
     float yaw, pitch, roll;

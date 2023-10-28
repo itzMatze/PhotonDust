@@ -1,177 +1,110 @@
 #include "vk/PathTracer.hpp"
 
-namespace ve 
+namespace ve
 {
-    PathTracer::PathTracer(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage) : vmc(vmc), vcc(vcc), storage(storage) {}
+    PathTracer::PathTracer(const VulkanMainContext& vmc, Storage& storage, AppState& app_state) : vmc(vmc), storage(storage), pipeline(vmc), dsh(vmc, frames_in_flight)
+    {
+        // set up images for path tracing
+        std::vector<unsigned char> initial_image(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
+        path_trace_images.push_back(storage.add_named_image("path_trace_image_0", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc));
+        path_trace_images.push_back(storage.add_named_image("path_trace_image_1", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc));
+
+        // set up buffers for path tracing
+        std::vector<float> initial_buffer_data(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
+        path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_0", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
+        path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_1", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
+    }
+
+    void PathTracer::construct(VulkanCommandContext& vcc)
+    {
+        for (uint32_t i : path_trace_images) storage.get_image(i).transition_image_layout(vcc, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, vk::AccessFlagBits::eNone, vk::AccessFlagBits::eNone);
+    }
 
     void PathTracer::self_destruct()
     {
-        vmc.logical_device.get().destroyAccelerationStructureKHR(topLevelAS.handle);
-        storage.destroy_buffer(topLevelAS.buffer);
-        storage.destroy_buffer(topLevelAS.scratch_buffer);
-        storage.destroy_buffer(instances_buffer);
+        for (uint32_t i : path_trace_images) storage.destroy_image(i);
+        path_trace_images.clear();
+        for (uint32_t i : path_trace_buffers) storage.destroy_buffer(i);
+        path_trace_buffers.clear();
+        pipeline.self_destruct();
+        dsh.self_destruct();
+    }
 
-        for (auto& blas : bottomLevelAS)
+    void PathTracer::reload_shaders()
+    {
+        pipeline.self_destruct();
+        create_pipeline();
+    }
+
+    void PathTracer::set_scene(uint32_t scene_texture_image_count, bool init)
+    {
+        scene_texture_count = scene_texture_image_count;
+        if (!init)
         {
-            vmc.logical_device.get().destroyAccelerationStructureKHR(blas.handle);
-            storage.destroy_buffer(blas.buffer);
-            storage.destroy_buffer(blas.scratch_buffer);
+            dsh.self_destruct();
+            pipeline.self_destruct();
         }
-        bottomLevelAS.clear();
-        instances.clear();
+        create_descriptor_set();
+        create_pipeline();
     }
 
-    uint32_t PathTracer::add_blas(vk::CommandBuffer& cb, uint32_t vertex_buffer_id, uint32_t index_buffer_id, const std::vector<uint32_t>& index_offsets, const std::vector<uint32_t>& index_counts, vk::DeviceSize vertex_stride) 
+    void PathTracer::compute(vk::CommandBuffer& cb, AppState& app_state, uint32_t read_only_image)
     {
-        Buffer& vertex_buffer = storage.get_buffer(vertex_buffer_id);
-        Buffer& index_buffer = storage.get_buffer(index_buffer_id);
+        ptpc.attenuation_view = app_state.attenuation_view;
+        ptpc.emission_view = app_state.emission_view;
+        ptpc.normal_view = app_state.normal_view;
+        ptpc.tex_view = app_state.tex_view;
+        if ((ptpc.attenuation_view | ptpc.emission_view | ptpc.normal_view | ptpc.tex_view) != 0) app_state.sample_count = 0;
+        ptpc.sample_count = app_state.sample_count;
+        cb.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline.get());
+        cb.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipeline.get_layout(), 0, dsh.get_sets()[read_only_image], {});
+        cb.pushConstants(pipeline.get_layout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PathTracerPushConstants), &ptpc);
+        cb.dispatch((app_state.render_extent.width + 31) / 32, (app_state.render_extent.height + 31) / 32, 1);
+    }
 
-        vk::DeviceOrHostAddressConstKHR vertex_buffer_device_adress(vertex_buffer.get_device_address());
-        vk::DeviceOrHostAddressConstKHR index_buffer_device_adress(index_buffer.get_device_address());
+    void PathTracer::create_pipeline()
+    {
+        std::array<vk::SpecializationMapEntry, 1> path_tracer_entries;
+        path_tracer_entries[0] = vk::SpecializationMapEntry(0, 0, sizeof(uint32_t));
+        std::array<uint32_t, 1> path_tracer_entries_data{scene_texture_count};
+        vk::SpecializationInfo path_tracer_spec_info(path_tracer_entries.size(), path_tracer_entries.data(), sizeof(uint32_t) * path_tracer_entries_data.size(), path_tracer_entries_data.data());
+        ShaderInfo path_tracer_shader_info = ShaderInfo{"path_trace.comp", vk::ShaderStageFlagBits::eFragment, path_tracer_spec_info};
+        pipeline.construct(dsh.get_layouts()[0], path_tracer_shader_info, sizeof(PathTracerPushConstants));
+    }
 
-        std::vector<uint32_t> num_triangles;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> asbris;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR*> pasbris;
-        std::vector<vk::AccelerationStructureGeometryKHR> asgs;
-        for (uint32_t i = 0; i < index_offsets.size(); ++i)
+    void PathTracer::create_descriptor_set()
+    {
+        dsh.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(1, vk::DescriptorType::eAccelerationStructureKHR, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(2, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(3, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(4, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(5, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(10, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(11, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(12, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(13, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(14, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(15, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute, scene_texture_count);
+        dsh.add_binding(16, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
-            vk::AccelerationStructureBuildRangeInfoKHR asbri{};
-            asbri.primitiveCount = index_counts[i] / 3;
-            asbri.primitiveOffset = sizeof(uint32_t) * index_offsets[i];
-            asbri.firstVertex = 0;
-            asbri.transformOffset = 0;
-            asbris.push_back(asbri);
-            num_triangles.push_back(asbri.primitiveCount);
-
-            vk::AccelerationStructureGeometryKHR asg{};
-            asg.flags = vk::GeometryFlagBitsKHR::eOpaque;
-            asg.geometryType = vk::GeometryTypeKHR::eTriangles;
-            asg.geometry.triangles.sType = vk::StructureType::eAccelerationStructureGeometryTrianglesDataKHR;
-            asg.geometry.triangles.vertexFormat = vk::Format::eR32G32B32Sfloat;
-            asg.geometry.triangles.vertexData = vertex_buffer_device_adress;
-            asg.geometry.triangles.maxVertex = vertex_buffer.get_element_count();
-            asg.geometry.triangles.vertexStride = vertex_stride;
-            asg.geometry.triangles.indexType = vk::IndexType::eUint32;
-            asg.geometry.triangles.indexData = index_buffer_device_adress;
-            asg.geometry.triangles.transformData.deviceAddress = 0;
-            asg.geometry.triangles.transformData.hostAddress = nullptr;
-            asgs.push_back(asg);
+            dsh.add_descriptor(i, 0, storage.get_buffer_by_name("uniform_buffer"));
+            dsh.add_descriptor(i, 1, storage.get_buffer_by_name("tlas"));
+            dsh.add_descriptor(i, 2, storage.get_image(path_trace_images[i]));
+            dsh.add_descriptor(i, 3, storage.get_image(path_trace_images[1 - i]));
+            dsh.add_descriptor(i, 4, storage.get_buffer(path_trace_buffers[i]));
+            dsh.add_descriptor(i, 5, storage.get_buffer(path_trace_buffers[1 - i]));
+            dsh.add_descriptor(i, 10, storage.get_buffer_by_name("vertices"));
+            dsh.add_descriptor(i, 11, storage.get_buffer_by_name("indices"));
+            dsh.add_descriptor(i, 12, storage.get_buffer_by_name("materials"));
+            dsh.add_descriptor(i, 13, storage.get_buffer_by_name("mesh_render_data"));
+            dsh.add_descriptor(i, 14, storage.get_buffer_by_name("model_mrd_indices"));
+            std::vector<Image> images;
+            for (uint32_t i = 0; i < scene_texture_count; ++i) images.push_back(storage.get_image_by_name("texture_" + std::to_string(i)));
+            dsh.add_descriptor(i, 15, images);
+            dsh.add_descriptor(i, 16, storage.get_buffer_by_name("lights"));
         }
-        pasbris.push_back(asbris.data());
-
-        vk::AccelerationStructureBuildGeometryInfoKHR asbgi{};
-        asbgi.type = vk::AccelerationStructureTypeKHR::eBottomLevel;
-        asbgi.flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-        asbgi.mode = vk::BuildAccelerationStructureModeKHR::eBuild;
-        asbgi.geometryCount = asgs.size();
-        asbgi.pGeometries = asgs.data();
-
-        AccelerationStructure blas;
-        vk::AccelerationStructureBuildSizesInfoKHR asbsi = vmc.logical_device.get().getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, asbgi, num_triangles);
-        blas.buffer = storage.add_buffer(asbsi.accelerationStructureSize, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR, true, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute);
-
-        vk::AccelerationStructureCreateInfoKHR asci{};
-        asci.sType = vk::StructureType::eAccelerationStructureCreateInfoKHR;
-        asci.buffer = storage.get_buffer(blas.buffer).get();
-        asci.size = asbsi.accelerationStructureSize;
-        asci.type = vk::AccelerationStructureTypeKHR::eBottomLevel;
-        blas.handle = vmc.logical_device.get().createAccelerationStructureKHR(asci);
-
-        vk::AccelerationStructureDeviceAddressInfoKHR asdai{};
-        asdai.sType = vk::StructureType::eAccelerationStructureDeviceAddressInfoKHR;
-        asdai.accelerationStructure = blas.handle;
-
-        blas.deviceAddress = vmc.logical_device.get().getAccelerationStructureAddressKHR(&asdai);
-
-        blas.scratch_buffer = storage.add_buffer(asbsi.buildScratchSize, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress, true, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute); 
-
-        asbgi.dstAccelerationStructure = blas.handle;
-        asbgi.scratchData.deviceAddress = storage.get_buffer(blas.scratch_buffer).get_device_address();
-        std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> asbgis{};
-        asbgis.push_back(asbgi);
-
-        cb.buildAccelerationStructuresKHR(asbgis, pasbris);
-        vk::BufferMemoryBarrier buffer_memory_barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR, vk::AccessFlagBits::eAccelerationStructureReadKHR, vmc.queue_family_indices.compute, vmc.queue_family_indices.compute, storage.get_buffer(blas.buffer).get(), 0, storage.get_buffer(blas.buffer).get_byte_size());
-        cb.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, vk::DependencyFlagBits::eDeviceGroup, {}, {buffer_memory_barrier}, {});
-        
-        bottomLevelAS.push_back(blas);
-        return bottomLevelAS.size() - 1;
-    }
-
-    uint32_t PathTracer::add_instance(uint32_t blas_idx, const glm::mat4& M, uint32_t custom_index)
-    {
-        vk::AccelerationStructureInstanceKHR instance;
-        instance.transform = std::array<std::array<float, 4>, 3>({std::array<float, 4>({M[0][0], M[0][1], M[0][2], M[0][3]}), std::array<float, 4>({M[1][0], M[1][1], M[1][2], M[1][3]}), std::array<float, 4>({M[2][0], M[2][1], M[2][2], M[2][3]})});
-        instance.accelerationStructureReference = bottomLevelAS[blas_idx].deviceAddress;
-        instance.instanceCustomIndex = custom_index;
-        instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
-        instance.mask = 0xFF;
-        instances.push_back(instance);
-        return instances.size() - 1;
-    }
-
-    void PathTracer::update_instance(uint32_t instance_idx, const glm::mat4& M)
-    {
-        instances[instance_idx].transform = std::array<std::array<float, 4>, 3>({std::array<float, 4>({M[0][0], M[1][0], M[2][0], M[3][0]}), std::array<float, 4>({M[0][1], M[1][1], M[2][1], M[3][1]}), std::array<float, 4>({M[0][2], M[1][2], M[2][2], M[3][2]})});
-    }
-
-    void PathTracer::create_tlas(vk::CommandBuffer& cb)
-    {
-        instances_buffer = storage.add_buffer(instances.data(), instances.size(), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR, false, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute);
-        storage.get_buffer(instances_buffer).update_data(instances);
-
-        vk::DeviceOrHostAddressConstKHR instance_data_device_address;
-        instance_data_device_address.deviceAddress = storage.get_buffer(instances_buffer).get_device_address();
-
-        vk::AccelerationStructureGeometryKHR asg;
-        asg.geometryType = vk::GeometryTypeKHR::eInstances;
-        asg.flags = vk::GeometryFlagBitsKHR::eOpaque;
-        asg.geometry.instances.sType = vk::StructureType::eAccelerationStructureGeometryInstancesDataKHR;
-        asg.geometry.instances.arrayOfPointers = VK_FALSE;
-        asg.geometry.instances.data = instance_data_device_address;
-
-        vk::AccelerationStructureBuildGeometryInfoKHR asbgi;
-        asbgi.type = vk::AccelerationStructureTypeKHR::eTopLevel;
-        asbgi.flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-        asbgi.mode = vk::BuildAccelerationStructureModeKHR::eBuild;
-        asbgi.geometryCount = 1;
-        asbgi.pGeometries = &asg;
-
-        uint32_t primitive_count = instances.size();
-
-        vk::AccelerationStructureBuildSizesInfoKHR asbsi{};
-        vmc.logical_device.get().getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, &asbgi, &primitive_count, &asbsi);
-
-        topLevelAS.buffer = storage.add_named_buffer("tlas", asbsi.accelerationStructureSize, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR, true, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute);
-
-        vk::AccelerationStructureCreateInfoKHR asci{};
-        asci.sType = vk::StructureType::eAccelerationStructureCreateInfoKHR;
-        asci.buffer = storage.get_buffer(topLevelAS.buffer).get();
-        asci.size = asbsi.accelerationStructureSize;
-        asci.type = vk::AccelerationStructureTypeKHR::eTopLevel;
-        topLevelAS.handle = vmc.logical_device.get().createAccelerationStructureKHR(asci);
-
-        vk::AccelerationStructureDeviceAddressInfoKHR asdai{};
-        asdai.sType = vk::StructureType::eAccelerationStructureDeviceAddressInfoKHR;
-        asdai.accelerationStructure = topLevelAS.handle;
-        topLevelAS.deviceAddress = vmc.logical_device.get().getAccelerationStructureAddressKHR(&asdai);
-
-        wdsas.accelerationStructureCount = 1;
-        wdsas.pAccelerationStructures = &(topLevelAS.handle);
-        storage.get_buffer(topLevelAS.buffer).pNext = &(wdsas);
-
-        topLevelAS.scratch_buffer = storage.add_buffer(asbsi.buildScratchSize, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress, true, vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute); 
-
-        asbgi.dstAccelerationStructure = topLevelAS.handle;
-        asbgi.scratchData.deviceAddress = storage.get_buffer(topLevelAS.scratch_buffer).get_device_address();
-
-        vk::AccelerationStructureBuildRangeInfoKHR asbri{};
-        asbri.primitiveCount = instances.size();
-        asbri.primitiveOffset = 0;
-        asbri.firstVertex = 0;
-        asbri.transformOffset = 0;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR*> asbris = {&asbri};
-
-        cb.buildAccelerationStructuresKHR(asbgi, asbris);
+        dsh.construct();
     }
 } // namespace ve

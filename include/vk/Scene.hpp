@@ -3,7 +3,7 @@
 #include "vk/Model.hpp"
 #include "Storage.hpp"
 #include "Timer.hpp"
-#include "vk/PathTracer.hpp"
+#include "vk/PathTraceBuilder.hpp"
 
 namespace ve
 {
@@ -14,7 +14,7 @@ namespace ve
         void construct();
         void self_destruct();
         void load(const std::string& path);
-        const std::vector<uint32_t>& get_texture_image_indices() const;
+        uint32_t get_texture_image_count() const;
 
         bool loaded = false;
 
@@ -45,6 +45,6 @@ namespace ve
         int32_t light_buffer = -1;
         uint32_t mesh_render_data_buffer;
         uint32_t model_mrd_indices_buffer;
-        PathTracer path_tracer;
+        PathTraceBuilder path_tracer;
     };
 } // namespace ve

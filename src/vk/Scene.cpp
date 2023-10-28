@@ -129,13 +129,13 @@ namespace ve
         model_mrd_indices_buffer = storage.add_named_buffer("model_mrd_indices", model_mrd_indices, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics);
 
         std::vector<unsigned char> texture_data(4, 0);
-        texture_image_indices.push_back(storage.add_image(texture_data.data(), 1, 1, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
+        texture_image_indices.push_back(storage.add_named_image("texture_" + std::to_string(texture_image_indices.size()), texture_data.data(), 1, 1, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
 
         loaded = true;
     }
 
-    const std::vector<uint32_t>& Scene::get_texture_image_indices() const
+    uint32_t Scene::get_texture_image_count() const
     {
-        return texture_image_indices;
+        return texture_image_indices.size();
     }
 } // namespace ve

@@ -12,11 +12,18 @@ Camera::Camera(float fov, float aspect_ratio) : fov(fov), yaw(0.0f), pitch(0.0f)
     data.sensor_size = glm::vec2(0.036, 0.036 / aspect_ratio);
     data.focal_length = 0.03;
     data.exposure = 1.0f;
-    projection = glm::perspective(glm::radians(fov), aspect_ratio, near, far);
     orientation = glm::quatLookAt(-back, up);
 }
 
-void Camera::updateVP(float time_diff)
+void Camera::update_data()
+{
+    data.pos = position;
+    data.u = u;
+    data.v = v;
+    data.w = w;
+}
+
+void Camera::update(float time_diff)
 {
     constexpr bool use_free_cam = false;
     // rotate initial coordinate system to camera orientation
@@ -53,19 +60,6 @@ void Camera::updateVP(float time_diff)
     // calculate view matrix
     glm::quat revers_orient = glm::conjugate(orientation);
     glm::mat4 rotation = glm::mat4_cast(revers_orient);
-    view = glm::translate(rotation, -position);
-
-    vp = projection * view;
-}
-
-glm::mat4 Camera::getVP()
-{
-    return vp;
-}
-
-glm::mat4 Camera::getV()
-{
-    return view;
 }
 
 void Camera::translate(glm::vec3 amount)
@@ -99,11 +93,6 @@ void Camera::rotate(float amount)
     roll -= amount;
 }
 
-void Camera::updateScreenSize(float aspect_ratio)
-{
-    projection = glm::perspective(glm::radians(fov), aspect_ratio, near, far);
-}
-
 const glm::vec3& Camera::getPosition() const
 {
     return position;
@@ -117,19 +106,4 @@ float Camera::getNear() const
 float Camera::getFar() const
 {
     return far;
-}
-
-glm::vec3 Camera::getFront() const
-{
-    return w;
-}
-
-glm::vec3 Camera::getUp() const
-{
-    return v;
-}
-
-glm::vec3 Camera::getRight() const
-{
-    return u;
 }

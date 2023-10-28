@@ -7,7 +7,7 @@ src/vk/CommandPool.cpp src/vk/DescriptorSetHandler.cpp src/vk/ExtensionsHandler.
 src/vk/Instance.cpp src/vk/LogicalDevice.cpp src/vk/PhysicalDevice.cpp
 src/vk/Pipeline.cpp src/vk/RenderPass.cpp src/vk/Swapchain.cpp
 src/vk/Shader.cpp src/vk/Synchronization.cpp src/vk/Image.cpp
-src/vk/PathTracer.cpp
+src/vk/PathTraceBuilder.cpp src/vk/PathTracer.cpp src/vk/Renderer.cpp src/vk/Histogram.cpp
 src/vk/Scene.cpp src/vk/Model.cpp src/vk/Mesh.cpp src/vk/Timer.cpp
 src/vk/VulkanCommandContext.cpp src/vk/VulkanMainContext.cpp src/WorkContext.cpp src/Storage.cpp
 "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/imgui.cpp" "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/imgui_draw.cpp" "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/imgui_widgets.cpp" "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/imgui_tables.cpp" "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/backends/imgui_impl_vulkan.cpp" "${PROJECT_SOURCE_DIR}/dependencies/imgui-1.89.9/backends/imgui_impl_sdl2.cpp" "${PROJECT_SOURCE_DIR}/dependencies/implot-0.16/implot.cpp" "${PROJECT_SOURCE_DIR}/dependencies/implot-0.16/implot_items.cpp")

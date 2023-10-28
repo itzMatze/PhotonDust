@@ -53,7 +53,7 @@ public:
         {
             move_amount = app_state.time_diff * move_speed;
             dispatch_pressed_keys();
-            app_state.cam.updateVP(app_state.time_diff);
+            app_state.cam.update(app_state.time_diff);
             try
             {
                 wc.draw_frame(app_state);

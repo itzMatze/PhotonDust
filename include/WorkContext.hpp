@@ -39,11 +39,14 @@ namespace ve
         std::vector<DeviceTimer> timers;
         Pipeline render_pipeline;
         Pipeline path_tracer_compute_pipeline;
+        Pipeline histogram_compute_pipeline;
         DescriptorSetHandler render_dsh;
         DescriptorSetHandler path_tracer_dsh;
+        DescriptorSetHandler histogram_dsh;
         std::vector<uint32_t> render_textures;
         std::vector<uint32_t> path_trace_images;
         std::vector<uint32_t> path_trace_buffers;
+        uint32_t histogram_buffer;
         uint32_t uniform_buffer;
         Camera::Data old_cam_data;
 
@@ -60,6 +63,8 @@ namespace ve
         void create_render_descriptor_set();
         void create_path_tracer_pipeline();
         void create_path_tracer_descriptor_set();
+        void create_histogram_pipeline(uint32_t bin_count);
+        void create_histogram_descriptor_set();
         void render(uint32_t image_idx, uint32_t read_only_image, AppState& app_state);
     };
 } // namespace ve

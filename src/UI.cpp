@@ -12,6 +12,7 @@ namespace ve
 {
     constexpr uint32_t plot_value_count = 1024;
     constexpr float update_weight = 0.1f;
+    constexpr ImU32 color_data[3] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000 };
 
     UI::UI(const VulkanMainContext& vmc, const RenderPass& render_pass, uint32_t frames) : vmc(vmc), frametime_values(plot_value_count, 0.0f), devicetimings(DeviceTimer::TIMER_COUNT, 0.0f)
     {
@@ -43,6 +44,7 @@ namespace ve
 
         ImGui::CreateContext();
         ImPlot::CreateContext();
+        implot_custom_colormap = ImPlot::AddColormap("RGBColors", color_data, 32);
 
         //this initializes imgui for SDL
         ImGui_ImplSDL2_InitForVulkan(vmc.window.value().get());
@@ -102,6 +104,17 @@ namespace ve
         ImGui::DragFloat("Camera sensor width", &app_state.cam.data.sensor_size.x, 0.001f, 0.001f, 0.05f);
         app_state.cam.data.sensor_size.y = app_state.cam.data.sensor_size.x / app_state.aspect_ratio;
         ImGui::DragFloat("Camera focal length", &app_state.cam.data.focal_length, 0.001f, 0.001f, 0.5f);
+        if (ImPlot::BeginPlot("Histogram"))
+        {
+            ImPlot::PushColormap(implot_custom_colormap);
+            ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_Outside | ImPlotLegendFlags_Horizontal);
+            ImPlot::SetupAxes("Brightness", "Count", ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_LockMin | ImPlotAxisFlags_AutoFit);
+            ImPlot::PlotLine("R", app_state.histogram.data(), app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
+            ImPlot::PlotLine("G", app_state.histogram.data() + app_state.bin_count_per_channel, app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
+            ImPlot::PlotLine("B", app_state.histogram.data() + app_state.bin_count_per_channel * 2, app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
+            ImPlot::EndPlot();
+            ImPlot::PopColormap();
+        }
         ImGui::Separator();
         ImGui::Checkbox("Attenuation view", &(app_state.attenuation_view));
         ImGui::Checkbox("Emission view", &(app_state.emission_view));

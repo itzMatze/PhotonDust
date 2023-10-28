@@ -15,50 +15,21 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(constant_id = 0) const uint TEXTURE_COUNT = 1;
 
-layout(push_constant) uniform PushConstant {
-    PathTracerPushConstants pc;
-};
+layout(push_constant) uniform PushConstant { PathTracerPushConstants pc; };
 
-layout(binding = 0) uniform UniformBuffer
-{
-    CameraData camera_data;
-};
+layout(binding = 0) uniform UniformBuffer { CameraData camera_data; };
 layout(binding = 1) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 2, rgba8) uniform restrict readonly image2D input_image;
 layout(binding = 3, rgba8) uniform restrict writeonly image2D output_image;
-layout(binding = 4) readonly buffer InputPixelBuffer
-{
-    PixelData input_pixel_data[];
-};
-layout(binding = 5) writeonly buffer OutputPixelBuffer
-{
-    PixelData output_pixel_data[];
-};
-layout(binding = 10) readonly buffer VertexBuffer
-{
-    AlignedVertex vertices[];
-};
-layout(binding = 11) readonly buffer IndexBuffer
-{
-    uint indices[];
-};
-layout(binding = 12) readonly buffer MaterialBuffer
-{
-    Material materials[];
-};
-layout(binding = 13) readonly buffer MeshRenderDataBuffer
-{
-    MeshRenderData mesh_render_data[];
-};
-layout(binding = 14) readonly buffer ModelMRDIndicesBuffer
-{
-    uint model_mrd_indices[];
-};
+layout(binding = 4) readonly buffer InputPixelBuffer { PixelData input_pixel_data[]; };
+layout(binding = 5) writeonly buffer OutputPixelBuffer { PixelData output_pixel_data[]; };
+layout(binding = 10) readonly buffer VertexBuffer { AlignedVertex vertices[]; };
+layout(binding = 11) readonly buffer IndexBuffer { uint indices[]; };
+layout(binding = 12) readonly buffer MaterialBuffer { Material materials[]; };
+layout(binding = 13) readonly buffer MeshRenderDataBuffer { MeshRenderData mesh_render_data[]; };
+layout(binding = 14) readonly buffer ModelMRDIndicesBuffer { uint model_mrd_indices[]; };
 layout(binding = 15) uniform sampler2D tex_sampler[TEXTURE_COUNT];
-layout(binding = 16) readonly buffer LightBuffer
-{
-    Light lights[];
-};
+layout(binding = 16) readonly buffer LightBuffer { Light lights[]; };
 
 #include "random.glsl"
 #include "spectral.glsl"

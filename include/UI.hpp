@@ -11,6 +11,8 @@ namespace ve
     struct AppState {
         std::vector<const char*> scene_names;
         std::vector<float> devicetimings;
+        std::vector<uint32_t> histogram;
+        uint32_t bin_count_per_channel = 128;
         vk::Extent2D render_extent;
         vk::Extent2D window_extent;
         float aspect_ratio;
@@ -47,5 +49,6 @@ namespace ve
         float time_diff = 0.0f;
         std::vector<FixVector<float>> devicetiming_values;
         std::vector<float> devicetimings;
+        int implot_custom_colormap;
 	};
 } // namespace ve

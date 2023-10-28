@@ -1,0 +1,45 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(constant_id = 0) const uint NUM_BINS = 1;
+const uint NUM_BINS_PER_CHANNEL = NUM_BINS / 3;
+
+layout(binding = 0, rgba8) uniform restrict readonly image2D input_image;
+layout(binding = 1) buffer HistogramOutputBuffer { uint histogram[]; };
+
+// count each rgb channel separately
+shared uint[NUM_BINS] local_hist;
+
+void main()
+{
+    const ivec2 g_id = ivec2(gl_GlobalInvocationID.xy);
+    const ivec2 l_id = ivec2(gl_LocalInvocationID.xy);
+    const ivec2 viewport_size = imageSize(input_image);
+
+    // set local histogram values to zero
+    for (uint i = 0; i < NUM_BINS; i += gl_WorkGroupSize.x)
+    {
+        if (l_id.x + i < NUM_BINS && l_id.y == 0) local_hist[l_id.x + i] = 0;
+    }
+    barrier();
+
+    // accumulate local histogram
+    if (g_id.x < viewport_size.x && g_id.y < viewport_size.y)
+    {
+        vec4 pixel = imageLoad(input_image, ivec2(g_id.x, g_id.y));
+        // each pixel is attenuated by alpha value to get actual visibility
+        pixel *= pixel.w;
+        ivec3 bin = ivec3(pixel * (NUM_BINS_PER_CHANNEL));
+        bin = clamp(bin, 0, int(NUM_BINS_PER_CHANNEL) - 1);
+
+        atomicAdd(local_hist[bin.r], 1);
+        atomicAdd(local_hist[bin.g + NUM_BINS_PER_CHANNEL], 1);
+        atomicAdd(local_hist[bin.b + 2 * NUM_BINS_PER_CHANNEL], 1);
+    }
+    barrier();
+
+    for (uint i = 0; i < NUM_BINS; i += gl_WorkGroupSize.x)
+    {
+        if (l_id.x + i < NUM_BINS && l_id.y == 0) atomicAdd(histogram[l_id.x + i], local_hist[l_id.x + i]);
+    }
+}

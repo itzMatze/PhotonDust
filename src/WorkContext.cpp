@@ -4,7 +4,7 @@
 
 namespace ve
 {
-    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc, swapchain.get_render_pass(), frames_in_flight), render_pipeline(vmc), path_tracer_compute_pipeline(vmc), render_dsh(vmc, frames_in_flight), path_tracer_dsh(vmc, frames_in_flight)
+    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc, swapchain.get_render_pass(), frames_in_flight), render_pipeline(vmc), path_tracer_compute_pipeline(vmc), histogram_compute_pipeline(vmc), render_dsh(vmc, frames_in_flight), path_tracer_dsh(vmc, frames_in_flight), histogram_dsh(vmc, frames_in_flight)
     {
         vcc.add_graphics_buffers(frames_in_flight);
         vcc.add_compute_buffers(1);
@@ -31,6 +31,12 @@ namespace ve
         path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_0", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
         path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_1", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
 
+        // set up histogram buffer
+        app_state.histogram.resize(app_state.bin_count_per_channel * 3, 0);
+        histogram_buffer = storage.add_named_buffer("histogram_buffer", app_state.histogram, vk::BufferUsageFlagBits::eStorageBuffer, false, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute);
+        create_histogram_descriptor_set();
+        create_histogram_pipeline(app_state.histogram.size());
+
         // set up textures that will be rendered
         render_textures.push_back(storage.add_named_image("render_texture_0", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc));
         render_textures.push_back(storage.add_named_image("render_texture_1", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc));
@@ -52,14 +58,17 @@ namespace ve
         path_trace_images.clear();
         for (uint32_t i : path_trace_buffers) storage.destroy_buffer(i);
         path_trace_buffers.clear();
+        storage.destroy_buffer(histogram_buffer);
         storage.destroy_buffer(uniform_buffer);
         ui.self_destruct();
         scene.self_destruct();
         swapchain.self_destruct(true);
         render_pipeline.self_destruct();
         path_tracer_compute_pipeline.self_destruct();
+        histogram_compute_pipeline.self_destruct();
         render_dsh.self_destruct();
         path_tracer_dsh.self_destruct();
+        histogram_dsh.self_destruct();
         spdlog::info("Destroyed WorkContext");
     }
 
@@ -153,6 +162,28 @@ namespace ve
         path_tracer_dsh.construct();
     }
 
+    void WorkContext::create_histogram_pipeline(uint32_t bin_count)
+    {
+        std::array<vk::SpecializationMapEntry, 1> histogram_entries;
+        histogram_entries[0] = vk::SpecializationMapEntry(0, 0, sizeof(uint32_t));
+        std::array<uint32_t, 1> histogram_entries_data{bin_count};
+        vk::SpecializationInfo histogram_spec_info(histogram_entries.size(), histogram_entries.data(), sizeof(uint32_t) * histogram_entries_data.size(), histogram_entries_data.data());
+        ShaderInfo histogram_shader_info = ShaderInfo{"histogram.comp", vk::ShaderStageFlagBits::eFragment, histogram_spec_info};
+        histogram_compute_pipeline.construct(histogram_dsh.get_layouts()[0], histogram_shader_info, 0);
+    }
+
+    void WorkContext::create_histogram_descriptor_set()
+    {
+        histogram_dsh.add_binding(0, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
+        histogram_dsh.add_binding(1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        for (uint32_t i = 0; i < frames_in_flight; ++i)
+        {
+            histogram_dsh.add_descriptor(i, 0, storage.get_image(path_trace_images[i]));
+            histogram_dsh.add_descriptor(i, 1, storage.get_buffer(histogram_buffer));
+        }
+        histogram_dsh.construct();
+    }
+
     void WorkContext::draw_frame(AppState& app_state)
     {
         vk::ResultValue<uint32_t> image_idx = vmc.logical_device.get().acquireNextImageKHR(swapchain.get(), uint64_t(-1), syncs[app_state.current_frame].get_semaphore(Synchronization::S_IMAGE_AVAILABLE));
@@ -176,6 +207,8 @@ namespace ve
             ptpc.sample_count = app_state.sample_count;
             old_cam_data = app_state.cam.data;
             storage.get_buffer(uniform_buffer).update_data_bytes(&app_state.cam.data, sizeof(Camera::Data));
+            storage.get_buffer(histogram_buffer).obtain_all_data(app_state.histogram);
+            storage.get_buffer(histogram_buffer).update_data_bytes(0, app_state.histogram.size() * sizeof(uint32_t));
         }
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)
         {
@@ -198,10 +231,6 @@ namespace ve
         vmc.logical_device.get().waitIdle();
         swapchain.self_destruct(false);
         swapchain.construct(vsync);
-        render_pipeline.self_destruct();
-        path_tracer_compute_pipeline.self_destruct();
-        create_render_pipeline();
-        create_path_tracer_pipeline();
         return swapchain.get_extent();
     }
 
@@ -213,6 +242,9 @@ namespace ve
             compute_cb.bindPipeline(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get());
             compute_cb.bindDescriptorSets(vk::PipelineBindPoint::eCompute, path_tracer_compute_pipeline.get_layout(), 0, path_tracer_dsh.get_sets()[read_only_image], {});
             compute_cb.pushConstants(path_tracer_compute_pipeline.get_layout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PathTracerPushConstants), &ptpc);
+            compute_cb.dispatch((app_state.render_extent.width + 31) / 32, (app_state.render_extent.height + 31) / 32, 1);
+            compute_cb.bindPipeline(vk::PipelineBindPoint::eCompute, histogram_compute_pipeline.get());
+            compute_cb.bindDescriptorSets(vk::PipelineBindPoint::eCompute, histogram_compute_pipeline.get_layout(), 0, histogram_dsh.get_sets()[read_only_image], {});
             compute_cb.dispatch((app_state.render_extent.width + 31) / 32, (app_state.render_extent.height + 31) / 32, 1);
             compute_cb.end();
             app_state.sample_count++;

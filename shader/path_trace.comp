@@ -218,6 +218,8 @@ void main()
     vec3 p = camera_data.pos;
     vec3 pixel_pos = -camera_data.w * camera_data.focal_length + norm_pixel.x * camera_data.u + norm_pixel.y * camera_data.v + p;
     vec3 dir = normalize(pixel_pos - p);
+
+    float exposure = camera_data.exposure;
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 attenuation = vec4(1.0, 1.0, 1.0, 1.0);
@@ -238,7 +240,11 @@ void main()
             vec3 v = -dir;
             p = p + dir * t;
             apply_surface_parameters(mrd, vertex, v, emission, attenuation, dir);
-            if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view) break;
+            if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view)
+            {
+                exposure = 1.0;
+                break;
+            }
         }
         else
         {
@@ -264,5 +270,5 @@ void main()
         }
     }
     output_pixel_data[pixel.y * viewport_size.x + pixel.x].col = out_color;
-    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color, vec4(INV_GAMMA)));
+    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color * exposure, vec4(INV_GAMMA)));
 }

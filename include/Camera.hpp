@@ -34,6 +34,7 @@ public:
         alignas(16) glm::vec3 w;
         alignas(8) glm::vec2 sensor_size;
         alignas(4) float focal_length;
+        alignas(4) float exposure;
 
         bool operator==(const Data& cam_data)
         {

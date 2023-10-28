@@ -14,6 +14,7 @@ struct CameraData
     vec3 w;
     vec2 sensor_size;
     float focal_length;
+    float exposure;
 };
 
 struct PixelData {

@@ -11,6 +11,7 @@ Camera::Camera(float fov, float aspect_ratio) : fov(fov), yaw(0.0f), pitch(0.0f)
 {
     data.sensor_size = glm::vec2(0.036, 0.036 / aspect_ratio);
     data.focal_length = 0.03;
+    data.exposure = 1.0f;
     projection = glm::perspective(glm::radians(fov), aspect_ratio, near, far);
     orientation = glm::quatLookAt(-back, up);
 }

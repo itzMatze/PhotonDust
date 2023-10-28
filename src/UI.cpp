@@ -97,30 +97,46 @@ namespace ve
             ImGui::Text("'G': Show/Hide UI");
             ImGui::Text("'F1': Screenshot");
         }
+        // scene
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Scene");
         ImGui::Combo("Scene", &app_state.current_scene, app_state.scene_names.data(), app_state.scene_names.size());
         app_state.load_scene = ImGui::Button("Load scene");
+        // camera
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Camera");
         ImGui::DragFloat("Camera sensor width", &app_state.cam.data.sensor_size.x, 0.001f, 0.001f, 0.05f);
         app_state.cam.data.sensor_size.y = app_state.cam.data.sensor_size.x / app_state.aspect_ratio;
         ImGui::DragFloat("Camera focal length", &app_state.cam.data.focal_length, 0.001f, 0.001f, 0.5f);
+        ImGui::DragFloat("Exposure", &app_state.cam.data.exposure, 0.1f, 0.0f, 50.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
         if (ImPlot::BeginPlot("Histogram"))
         {
             ImPlot::PushColormap(implot_custom_colormap);
             ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_Outside | ImPlotLegendFlags_Horizontal);
-            ImPlot::SetupAxes("Brightness", "Count", ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_LockMin | ImPlotAxisFlags_AutoFit);
+            // set y-axis maximum with maximum histogram value, excluding 0 and maximum brightness
+            uint32_t max = 0;
+            for (uint32_t i = 0; i < app_state.histogram.size(); ++i)
+            {
+                if (i % app_state.bin_count_per_channel != 0 && i % (app_state.bin_count_per_channel - 1) != 0 && app_state.histogram[i] > max) max = app_state.histogram[i];
+            }
+            ImPlot::SetupAxesLimits(0.0, 1.0, 0.0, max, ImPlotCond_Always);
+            ImPlot::SetupAxes("Brightness", "Count", ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines);
             ImPlot::PlotLine("R", app_state.histogram.data(), app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
             ImPlot::PlotLine("G", app_state.histogram.data() + app_state.bin_count_per_channel, app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
             ImPlot::PlotLine("B", app_state.histogram.data() + app_state.bin_count_per_channel * 2, app_state.bin_count_per_channel, 1.0 / app_state.bin_count_per_channel);
-            ImPlot::EndPlot();
             ImPlot::PopColormap();
+            ImPlot::EndPlot();
         }
+        // debug views
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Debug Views");
         ImGui::Checkbox("Attenuation view", &(app_state.attenuation_view));
         ImGui::Checkbox("Emission view", &(app_state.emission_view));
         ImGui::Checkbox("Normal view", &(app_state.normal_view));
         ImGui::Checkbox("Texel view", &(app_state.tex_view));
+        // path tracing
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Path Tracing");
         ImGui::Checkbox("Accumulate samples", &app_state.accumulate_samples);
         ImGui::Checkbox("Force accumulate samples", &app_state.force_accumulate_samples);
         ImGui::Text((std::string("VSync: ") + (app_state.vsync ? std::string("on") : std::string("off"))).c_str());

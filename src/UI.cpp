@@ -109,6 +109,8 @@ namespace ve
         app_state.cam.data.sensor_size.y = app_state.cam.data.sensor_size.x / app_state.aspect_ratio;
         ImGui::DragFloat("Camera focal length", &app_state.cam.data.focal_length, 0.001f, 0.001f, 0.5f);
         ImGui::DragFloat("Exposure", &app_state.cam.data.exposure, 0.1f, 0.0f, 50.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
+        app_state.bin_count_changed |= ImGui::SliderInt("Bin count", &app_state.bin_count_per_channel, 1, 512);
+        ImGui::SliderInt("Histogram update rate", &app_state.histogram_update_rate, 1, 512);
         if (ImPlot::BeginPlot("Histogram"))
         {
             ImPlot::PushColormap(implot_custom_colormap);

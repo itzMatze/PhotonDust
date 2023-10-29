@@ -109,7 +109,14 @@ namespace ve
         {
             vk::CommandBuffer& compute_cb = vcc.begin(vcc.compute_cbs[0]);
             path_tracer.compute(compute_cb, app_state, read_only_image);
-            histogram.compute(compute_cb, app_state, read_only_image);
+            if (app_state.bin_count_changed)
+            {
+                app_state.bin_count_changed = false;
+                app_state.histogram = std::vector<uint32_t>(app_state.bin_count_per_channel * 3, 0);
+                histogram.self_destruct();
+                histogram.construct(app_state);
+            }
+            if (app_state.sample_count % app_state.histogram_update_rate == 0) histogram.compute(compute_cb, app_state, read_only_image);
             compute_cb.end();
             app_state.sample_count++;
         }

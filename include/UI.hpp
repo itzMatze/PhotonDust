@@ -12,7 +12,9 @@ namespace ve
         std::vector<const char*> scene_names;
         std::vector<float> devicetimings;
         std::vector<uint32_t> histogram;
-        uint32_t bin_count_per_channel = 128;
+        int32_t bin_count_per_channel = 128;
+        bool bin_count_changed = false;
+        int32_t histogram_update_rate = 50;
         vk::Extent2D render_extent;
         vk::Extent2D window_extent;
         float aspect_ratio;

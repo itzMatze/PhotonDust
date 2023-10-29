@@ -127,7 +127,7 @@ float ndf_ggx(in float nh, in float r)
     float r2 = r * r;
     float denom = (nh * nh * (r2 - 1.0) + 1.0);
     denom = PI * denom * denom;
-    return r2 / max(denom, EPS);
+    return denom > EPS ? r2 / denom : 1.0;
 }
 
 float geometry_schlick_ggx(in float nl, in float nv, in float r)
@@ -145,8 +145,6 @@ vec3 fresnel_schlick(in float vh, in vec3 F0)
 
 vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albedo, in float metallic, in float r)
 {
-    vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo, metallic);
     float nh = clamp(dot(n, h), 0.0, 1.0);
     float nv = clamp(dot(n, v), 0.0, 1.0);
     float nl = clamp(dot(n, l), 0.0, 1.0);
@@ -154,12 +152,12 @@ vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albe
 
     // float D = ndf_ggx(nh, r);
     float G = geometry_schlick_ggx(nl, nv, r);
-    vec3 F = fresnel_schlick(vh, F0);
+    vec3 F = fresnel_schlick(vh, albedo);
     // Microfacet specular = D * G * F / (4 * nl * nv)
     // pdf = D * nh / (4 * vh)
     // solid angle cosine = nl
     vec3 specular = nl > 0 ? (F * G * vh) / max((nh * nv), EPS) : vec3(0.0);
-    return vec4((1 - metallic) * (brdf_oren_nayar(l, n, v, r) * albedo + F) + (metallic) * specular, 1.0);
+    return vec4(specular, 1.0);
 }
 
 void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, inout vec4 emission, inout vec4 attenuation, out vec3 l)
@@ -181,7 +179,7 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
     else color = vec4(0.0, 0.0, 0.0, 0.0);
     vec3 h = normalize(v + l);
     // only full metallic or non metallic is possible as otherwise the importance sampling probabilities are incorrect
-    if (m.metallic == 1.0)
+    if (pcg_random_state() < m.metallic)
     {
         h = importance_sample_ggx(vertex.normal, m.roughness);
         l = normalize(2 * dot(v, h) * h - v);

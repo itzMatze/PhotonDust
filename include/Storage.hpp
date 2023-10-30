@@ -15,7 +15,6 @@ namespace ve
         template<typename... Args>
         uint32_t add_named_buffer(const std::string& name, Args&&... args)
         {
-            buffers.emplace_back(std::make_optional<Buffer>(vmc, vcc, std::forward<Args>(args)...));
             if (buffer_names.contains(name))
             {
                 if (buffers.at(buffer_names.at(name)).has_value())
@@ -26,23 +25,23 @@ namespace ve
                 else
                 {
                     // buffer name exists but the corresponding buffer got deleted; so, reuse the name
-                    buffer_names.at(name) = buffers.size() - 1;
+                    buffers.at(buffer_names.at(name)).emplace(vmc, vcc, std::forward<Args>(args)...);
                 }
             }
             else
             {
+                buffers.emplace_back(std::make_optional<Buffer>(vmc, vcc, std::forward<Args>(args)...));
                 buffer_names.emplace(name, buffers.size() - 1);
             }
-            const vk::Buffer& b = buffers.back().value().get();
+            const vk::Buffer& b = buffers.at(buffer_names.at(name)).value().get();
             vk::DebugUtilsObjectNameInfoEXT dmoni(b.objectType, uint64_t(static_cast<vk::Buffer::CType>(b)), name.c_str());
             vmc.logical_device.get().setDebugUtilsObjectNameEXT(dmoni);
-            return buffers.size() - 1;
+            return buffer_names.at(name);
         }
 
         template<typename... Args>
         uint32_t add_named_image(const std::string& name, Args&&... args)
         {
-            images.emplace_back(std::make_optional<Image>(vmc, vcc, std::forward<Args>(args)...));
             if (image_names.contains(name))
             {
                 if (images.at(image_names.at(name)).has_value())
@@ -53,14 +52,18 @@ namespace ve
                 else
                 {
                     // image name exists but the corresponding image got deleted; so, reuse the name
-                    image_names.at(name) = images.size() - 1;
+                    images.at(image_names.at(name)).emplace(vmc, vcc, std::forward<Args>(args)...);
                 }
             }
             else
             {
+                images.emplace_back(std::make_optional<Image>(vmc, vcc, std::forward<Args>(args)...));
                 image_names.emplace(name, images.size() - 1);
             }
-            return images.size() - 1;
+            const vk::Image& i = images.at(image_names.at(name)).value().get_image();
+            vk::DebugUtilsObjectNameInfoEXT dmoni(i.objectType, uint64_t(static_cast<vk::Image::CType>(i)), name.c_str());
+            vmc.logical_device.get().setDebugUtilsObjectNameEXT(dmoni);
+            return image_names.at(name);
         }
 
         template<typename... Args>

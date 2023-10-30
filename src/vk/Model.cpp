@@ -59,9 +59,9 @@ namespace ve
                 int texture_idx = mat.values.at(name).TextureIndex();
                 if (texture_indices[texture_idx] > -1) return texture_indices[texture_idx];
                 const tinygltf::Texture& tex = model.textures[texture_idx];
-                model_data.texture_image_indices.push_back(storage.add_image(model.images[tex.source].image.data(), model.images[tex.source].width, model.images[tex.source].height, true, base_mip_level, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
                 texture_indices[texture_idx] = total_texture_count;
                 total_texture_count++;
+                model_data.texture_image_indices.push_back(storage.add_named_image("texture_" + std::to_string(texture_indices[texture_idx]), model.images[tex.source].image.data(), model.images[tex.source].width, model.images[tex.source].height, true, base_mip_level, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
                 return texture_indices[texture_idx];
             };
 
@@ -260,7 +260,7 @@ namespace ve
                 m.base_texture = total_texture_count;
                 total_texture_count++;
                 std::string filename(std::string("../assets/textures/") + std::string(material_json.value("base_texture", "")));
-                model_data.texture_image_indices.push_back(storage.add_image(filename, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
+                model_data.texture_image_indices.push_back(storage.add_named_image("texture_" + std::to_string(m.base_texture), filename, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));
             }
             if (material_json.contains("emission")) m.emission = glm::vec4(material_json.at("emission")[0], material_json.at("emission")[1], material_json.at("emission")[2], material_json.at("emission")[3]);
             if (material_json.contains("emission_strength")) m.emission_strength = material_json.at("emission_strength");

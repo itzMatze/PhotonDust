@@ -235,10 +235,9 @@ int main(int argc, char** argv)
     spdlog::set_level(spdlog::level::debug);
     spdlog::set_pattern("[%Y-%m-%d %T.%e] [%L] %v");
     spdlog::info("Starting");
-    auto t1 = std::chrono::high_resolution_clock::now();
+    ve::HostTimer timer;
     MainContext mc;
-    auto t2 = std::chrono::high_resolution_clock::now();
-    spdlog::info("Setup took: {} ms", (std::chrono::duration<double, std::milli>(t2 - t1).count()));
+    spdlog::info("Setup took: {} ms", timer.elapsed<std::milli>());
     mc.run();
     return 0;
 }

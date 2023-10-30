@@ -60,7 +60,7 @@ namespace ve
         if (scene.loaded) scene.self_destruct();
         scene.load(std::string("../assets/scenes/") + filename);
         scene.construct();
-        spdlog::info("Loading scene took: {} ms", (timer.elapsed()));
+        spdlog::info("Loading scene took: {} ms", (timer.elapsed<std::milli>()));
         path_tracer.set_scene(scene.get_texture_image_count(), init);
     }
 

@@ -109,6 +109,20 @@ vec3 importance_sample_ggx(in vec3 n, in float roughness)
     return normalize(h.z * n - tangent * h.x + bitangent * h.y);
 }
 
+float get_refractive_index(float wavelength, vec3 B, vec3 C)
+{
+    // use Sellmeier equation
+    float w2 = wavelength * wavelength;
+    return 1 + sqrt((B.x * w2) / (w2 - C.x) + (B.y * w2) / (w2 - C.y) + (B.z * w2) / (w2 - C.z));
+}
+
+float get_air_refractive_index(float wavelength)
+{
+    // Ciddor (1996)
+    float inv_w2 = 1 / (wavelength * wavelength);
+    return 1 + (0.05792105 / (238.0185 - inv_w2) + 0.00167917 / (57.362 - inv_w2));
+}
+
 float brdf_oren_nayar(in vec3 l, in vec3 n, in vec3 v, float r)
 {
     float r2 = r * r;
@@ -160,7 +174,7 @@ vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albe
     return vec4(specular, 1.0);
 }
 
-void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, inout vec4 emission, inout vec4 attenuation, out vec3 l)
+void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, inout vec4 emission, inout vec4 attenuation, out vec3 l)
 {
     l = cosine_sample_hemisphere(vertex.normal);
     // object does not have material, make it fully diffuse with the vertex color
@@ -178,16 +192,39 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
     else if (length(m.base_color) > 0.0) color = m.base_color;
     else color = vec4(0.0, 0.0, 0.0, 0.0);
     vec3 h = normalize(v + l);
-    // only full metallic or non metallic is possible as otherwise the importance sampling probabilities are incorrect
-    if (pcg_random_state() < m.metallic)
+    if (pcg_random_state() < m.B_transmission.w)
     {
-        h = importance_sample_ggx(vertex.normal, m.roughness);
-        l = normalize(2 * dot(v, h) * h - v);
-        attenuation *= brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness);
+        // transmission
+        // convert wavelength to micrometer as Sellmeier assumes micrometes
+        float w = float(wavelength) / 1000.0;
+        float ref_idx_air = get_air_refractive_index(w);
+        float ref_idx_mat = get_refractive_index(w, m.B_transmission.xyz, m.C);
+        if (dot(v, vertex.normal) > 0.0)
+        {
+            // view vector and normal align -> from air to transmissive material
+            l = refract(-v, vertex.normal, ref_idx_air / ref_idx_mat);
+            if (length(l) < 0.9) l = reflect(-v, vertex.normal);
+        }
+        else
+        {
+            // view vector and normal do not align -> from transmissive material to air
+            l = refract(-v, -vertex.normal, ref_idx_mat / ref_idx_air);
+            if (length(l) < 0.9) l = reflect(-v, -vertex.normal);
+        }
     }
     else
     {
-        attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness) * color;
+        // surface reflection
+        if (pcg_random_state() < m.metallic)
+        {
+            h = importance_sample_ggx(vertex.normal, m.roughness);
+            l = normalize(2 * dot(v, h) * h - v);
+            attenuation *= brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness);
+        }
+        else
+        {
+            attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness) * color;
+        }
     }
 }
 
@@ -221,6 +258,7 @@ void main()
     vec4 out_color = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 attenuation = vec4(1.0, 1.0, 1.0, 1.0);
+    // wavelength in nanometers
     uint wavelength = get_random_wavelength(pcg_random_state());
     float t = 0.0;
     int instance_id = 0;
@@ -237,7 +275,7 @@ void main()
             vertex = interpolate_attributes(mrd, primitive_idx, bary);
             vec3 v = -dir;
             p = p + dir * t;
-            apply_surface_parameters(mrd, vertex, v, emission, attenuation, dir);
+            apply_surface_parameters(mrd, vertex, v, wavelength, emission, attenuation, dir);
             if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view)
             {
                 exposure = 1.0;

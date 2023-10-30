@@ -105,6 +105,10 @@ namespace ve
             {
                 material.emission_strength = mat.extensions.at("KHR_materials_emissive_strength").Get("emissiveStrength").GetNumberAsDouble();
             }
+            if (mat.extensions.find("KHR_materials_transmission") != mat.extensions.end())
+            {
+                material.transmission = mat.extensions.at("KHR_materials_transmission").Get("transmissionFactor").GetNumberAsDouble();
+            }
             material_indices[mat_idx] = total_material_count;
             total_material_count++;
             model_data.materials.push_back(material);
@@ -267,6 +271,13 @@ namespace ve
             if (material_json.contains("base_color")) m.base_color = glm::vec4(material_json.at("base_color")[0], material_json.at("base_color")[1], material_json.at("base_color")[2], material_json.at("base_color")[3]);
             if (material_json.contains("roughness")) m.roughness = material_json.at("roughness");
             if (material_json.contains("metallic")) m.metallic = material_json.at("metallic");
+            if (material_json.contains("transmission")) m.transmission = material_json.at("transmission");
+            if (material_json.contains("sellmeier_coefficients"))
+            {
+                auto s_c = material_json.at("sellmeier_coefficients");
+                m.B = glm::vec3(s_c.at("B")[0], s_c.at("B")[1], s_c.at("B")[2]);
+                m.C = glm::vec3(s_c.at("C")[0], s_c.at("C")[1], s_c.at("C")[2]);
+            }
             model_data.materials.push_back(m);
             total_material_count++;
             return total_material_count - 1;

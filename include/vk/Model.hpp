@@ -19,6 +19,10 @@ namespace ve
         float metallic = 0.0f;
         float roughness = 1.0f;
         int32_t base_texture = -1;
+        // use borosilicate crown glass (BK7) by default
+        glm::vec3 B = glm::vec3(1.03961212, 0.231792344, 1.01046945);
+        float transmission = 0.0f;
+        alignas(16) glm::vec3 C = glm::vec3(0.00600069867, 0.0200179144, 103.560653);
         //int32_t emissive_texture = -1;
         //int32_t metallic_roughness_texture = -1;
         //int32_t normal_texture = -1;

@@ -33,6 +33,8 @@ struct Material {
     float metallic;
     float roughness;
     int base_texture;
+    vec4 B_transmission;
+    vec3 C;
     //int emissive_texture;
     //int metallic_roughness_texture;
     //int normal_texture;

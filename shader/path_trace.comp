@@ -89,6 +89,7 @@ vec3 cosine_sample_hemisphere(in vec3 n) {
 
 vec3 importance_sample_ggx(in vec3 n, in float roughness)
 {
+    if (roughness == 0.0) return n;
     float r2 = roughness * roughness;
     vec2 xi = vec2(pcg_random_state(), pcg_random_state());
     float phi = 2.0 * PI * xi.x;
@@ -152,6 +153,12 @@ float geometry_schlick_ggx(in float nl, in float nv, in float r)
     return max(gv * gl, EPS);
 }
 
+float fresnel_schlick(in float vh, in float n_1, in float n_2)
+{
+    float F0 = pow((n_1 - n_2) / (n_1 + n_2), 2);
+    return F0 + (1.0 - F0) * pow(1.0 - vh, 5.0);
+}
+
 vec3 fresnel_schlick(in float vh, in vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(1.0 - vh, 5.0);
@@ -176,53 +183,55 @@ vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albe
 
 void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, inout vec4 emission, inout vec4 attenuation, out vec3 l)
 {
-    l = cosine_sample_hemisphere(vertex.normal);
     // object does not have material, make it fully diffuse with the vertex color
     if (mrd.mat_idx < 0)
     {
+        l = cosine_sample_hemisphere(vertex.normal);
         attenuation *= brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color;
         return;
     }
     Material m = materials[mrd.mat_idx];
     // add attenuated emission of material
-    if (length(m.emission) > 0.0) emission += attenuation * m.emission * m.emission_strength;
+    emission += attenuation * m.emission * m.emission_strength;
     // get color of material at position
     vec4 color = vec4(0.0);
     if (m.base_texture >= 0) color = texture(tex_sampler[m.base_texture], vertex.tex);
     else if (length(m.base_color) > 0.0) color = m.base_color;
     else color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec3 h = normalize(v + l);
     if (pcg_random_state() < m.B_transmission.w)
     {
         // transmission
-        // convert wavelength to micrometer as Sellmeier assumes micrometes
+        // convert wavelength to micrometer as Sellmeier assumes micrometers
         float w = float(wavelength) / 1000.0;
         float ref_idx_air = get_air_refractive_index(w);
         float ref_idx_mat = get_refractive_index(w, m.B_transmission.xyz, m.C);
-        if (dot(v, vertex.normal) > 0.0)
-        {
-            // view vector and normal align -> from air to transmissive material
-            l = refract(-v, vertex.normal, ref_idx_air / ref_idx_mat);
-            if (length(l) < 0.9) l = reflect(-v, vertex.normal);
-        }
-        else
+        // view vector and normal align -> from air to transmissive material
+        float ref_idx_one = ref_idx_air;
+        float ref_idx_two = ref_idx_mat;
+        if (dot(v, vertex.normal) < 0.0)
         {
             // view vector and normal do not align -> from transmissive material to air
-            l = refract(-v, -vertex.normal, ref_idx_mat / ref_idx_air);
-            if (length(l) < 0.9) l = reflect(-v, -vertex.normal);
+            vertex.normal = -vertex.normal;
+            ref_idx_one = ref_idx_mat;
+            ref_idx_two = ref_idx_air;
         }
+        float F = fresnel_schlick(dot(v, vertex.normal), ref_idx_one, ref_idx_two);
+        l = refract(-v, vertex.normal, ref_idx_one / ref_idx_two);
+        if (length(l) > 0.1 && pcg_random_state() > F) return;
+        else l = reflect(-v, vertex.normal);
     }
     else
     {
         // surface reflection
         if (pcg_random_state() < m.metallic)
         {
-            h = importance_sample_ggx(vertex.normal, m.roughness);
-            l = normalize(2 * dot(v, h) * h - v);
+            vec3 h = importance_sample_ggx(vertex.normal, m.roughness);
+            l = reflect(-v, h);
             attenuation *= brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness);
         }
         else
         {
+            l = cosine_sample_hemisphere(vertex.normal);
             attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness) * color;
         }
     }

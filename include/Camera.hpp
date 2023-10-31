@@ -9,21 +9,20 @@ class Camera
 {
 public:
     Camera(float fov, float aspect_ratio);
+    Camera(float fov, float aspect_ratio, float sensor_width, float focal_length, float exposure, glm::vec3 pos, glm::vec3 euler);
     void update_data();
     void update(float time_diff);
     void translate(glm::vec3 v);
-    void onMouseMove(float xRel, float yRel);
-    void moveFront(float amount);
-    void moveRight(float amount);
-    void moveUp(float amount);
+    void on_mouse_move(float xRel, float yRel);
+    void move_front(float amount);
+    void move_right(float amount);
+    void move_up(float amount);
     void rotate(float amount);
-    void updateScreenSize(float aspect_ratio);
-    const glm::vec3& getPosition() const;
-    float getNear() const;
-    float getFar() const;
-    glm::vec3 getFront() const;
-    glm::vec3 getUp() const;
-    glm::vec3 getRight() const;
+    void update_screen_size(float aspect_ratio);
+    const glm::vec3& get_position() const;
+    float get_near() const;
+    float get_far() const;
+    glm::vec3 get_euler() const;
 
     struct Data
     {
@@ -53,5 +52,5 @@ private:
     float near, far;
     float yaw, pitch, roll;
     float fov;
-    const float mouse_sensitivity = 0.25f;
+    float mouse_sensitivity = 0.25f;
 };

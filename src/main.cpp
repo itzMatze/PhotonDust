@@ -13,6 +13,7 @@
 #include "vk/VulkanMainContext.hpp"
 #include "vk/VulkanCommandContext.hpp"
 #include "WorkContext.hpp"
+#include "SettingsCache.hpp"
 
 constexpr uint32_t render_width = 3840;
 constexpr uint32_t render_height = 2160;
@@ -36,11 +37,17 @@ public:
 
     void run()
     {
+        std::string default_scene("default.json");
+        if (sc.load_cache())
+        {
+            default_scene = sc.data.scene_name;
+            app_state.cam = Camera(60.0f, aspect_ratio, sc.data.sensor_width, sc.data.focal_length, sc.data.exposure, sc.data.pos, sc.data.euler);
+        }
         std::vector<std::string> scene_names;
         app_state.current_scene = 0;
         for (const auto& entry : std::filesystem::directory_iterator("../assets/scenes/"))
         {
-            if (entry.path().filename() == "default.json") app_state.current_scene = scene_names.size();
+            if (entry.path().filename() == default_scene) app_state.current_scene = scene_names.size();
             scene_names.push_back(entry.path().filename());
         }
         for (const auto& name : scene_names) app_state.scene_names.push_back(&name.front());
@@ -85,22 +92,23 @@ private:
     ve::VulkanCommandContext vcc;
     ve::WorkContext wc;
     EventHandler eh;
+    SettingsCache sc;
     float move_amount;
     float move_speed = 20.0f;
 
     void dispatch_pressed_keys()
     {
-        if (eh.is_key_pressed(Key::W)) app_state.cam.moveFront(move_amount);
-        if (eh.is_key_pressed(Key::A)) app_state.cam.moveRight(-move_amount);
-        if (eh.is_key_pressed(Key::S)) app_state.cam.moveFront(-move_amount);
-        if (eh.is_key_pressed(Key::D)) app_state.cam.moveRight(move_amount);
-        if (eh.is_key_pressed(Key::Q)) app_state.cam.moveUp(-move_amount);
-        if (eh.is_key_pressed(Key::E)) app_state.cam.moveUp(move_amount);
+        if (eh.is_key_pressed(Key::W)) app_state.cam.move_front(move_amount);
+        if (eh.is_key_pressed(Key::A)) app_state.cam.move_right(-move_amount);
+        if (eh.is_key_pressed(Key::S)) app_state.cam.move_front(-move_amount);
+        if (eh.is_key_pressed(Key::D)) app_state.cam.move_right(move_amount);
+        if (eh.is_key_pressed(Key::Q)) app_state.cam.move_up(-move_amount);
+        if (eh.is_key_pressed(Key::E)) app_state.cam.move_up(move_amount);
         float panning_speed = eh.is_key_pressed(Key::Shift) ? 200.0f : 600.0f;
-        if (eh.is_key_pressed(Key::Left)) app_state.cam.onMouseMove(-panning_speed * app_state.time_diff, 0.0f);
-        if (eh.is_key_pressed(Key::Right)) app_state.cam.onMouseMove(panning_speed * app_state.time_diff, 0.0f);
-        if (eh.is_key_pressed(Key::Up)) app_state.cam.onMouseMove(0.0f, -panning_speed * app_state.time_diff);
-        if (eh.is_key_pressed(Key::Down)) app_state.cam.onMouseMove(0.0f, panning_speed * app_state.time_diff);
+        if (eh.is_key_pressed(Key::Left)) app_state.cam.on_mouse_move(-panning_speed * app_state.time_diff, 0.0f);
+        if (eh.is_key_pressed(Key::Right)) app_state.cam.on_mouse_move(panning_speed * app_state.time_diff, 0.0f);
+        if (eh.is_key_pressed(Key::Up)) app_state.cam.on_mouse_move(0.0f, -panning_speed * app_state.time_diff);
+        if (eh.is_key_pressed(Key::Down)) app_state.cam.on_mouse_move(0.0f, panning_speed * app_state.time_diff);
 
         // reset state of keys that are used to execute a one time action
         if (eh.is_key_released(Key::Plus))
@@ -154,6 +162,17 @@ private:
             eh.set_released_key(Key::V, false);
             app_state.vsync = !app_state.vsync;
             wc.recreate_swapchain(app_state.vsync);
+        }
+        if (eh.is_key_released(Key::C))
+        {
+            eh.set_released_key(Key::C, false);
+            sc.data.scene_name = app_state.scene_names[app_state.current_scene];
+            sc.data.pos = app_state.cam.get_position();
+            sc.data.euler = app_state.cam.get_euler();
+            sc.data.sensor_width = app_state.cam.data.sensor_size.x;
+            sc.data.focal_length = app_state.cam.data.focal_length;
+            sc.data.exposure = app_state.cam.data.exposure;
+            sc.save_cache();
         }
         if (eh.is_key_released(Key::One))
         {
@@ -213,7 +232,7 @@ private:
         if (eh.is_key_pressed(Key::MouseLeft))
         {
             if (!SDL_GetRelativeMouseMode()) SDL_SetRelativeMouseMode(SDL_TRUE);
-            app_state.cam.onMouseMove(eh.mouse_motion.x * 1.5f, eh.mouse_motion.y * 1.5f);
+            app_state.cam.on_mouse_move(eh.mouse_motion.x * 1.5f, eh.mouse_motion.y * 1.5f);
             eh.mouse_motion = glm::vec2(0.0f);
         }
         if (eh.is_key_released(Key::MouseLeft))

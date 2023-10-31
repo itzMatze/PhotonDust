@@ -15,6 +15,20 @@ Camera::Camera(float fov, float aspect_ratio) : fov(fov), yaw(0.0f), pitch(0.0f)
     orientation = glm::quatLookAt(-back, up);
 }
 
+Camera::Camera(float fov, float aspect_ratio, float sensor_width, float focal_length, float exposure, glm::vec3 pos, glm::vec3 euler) : fov(fov), yaw(0.0f), pitch(0.0f), roll(0.0f), near(0.1f), far(10000.0f), position(pos)
+{
+    data.sensor_size = glm::vec2(sensor_width, sensor_width / aspect_ratio);
+    data.focal_length = focal_length;
+    data.exposure = exposure;
+    pitch = euler.x;
+    yaw = euler.y;
+    roll = euler.z;
+    glm::quat q_pitch = glm::angleAxis(glm::radians(pitch), right);
+    glm::quat q_yaw = glm::angleAxis(glm::radians(yaw), up);
+    glm::quat q_roll = glm::angleAxis(glm::radians(roll), back);
+    orientation = glm::normalize(q_yaw * q_pitch * q_roll);
+}
+
 void Camera::update_data()
 {
     data.pos = position;
@@ -67,23 +81,23 @@ void Camera::translate(glm::vec3 amount)
     position += amount;
 }
 
-void Camera::onMouseMove(float xRel, float yRel)
+void Camera::on_mouse_move(float xRel, float yRel)
 {
     yaw -= xRel * mouse_sensitivity;
     pitch -= yRel * mouse_sensitivity;
 }
 
-void Camera::moveFront(float amount)
+void Camera::move_front(float amount)
 {
     translate(-amount * w);
 }
 
-void Camera::moveRight(float amount)
+void Camera::move_right(float amount)
 {
     translate(amount * u);
 }
 
-void Camera::moveUp(float amount)
+void Camera::move_up(float amount)
 {
     translate(up * amount);
 }
@@ -93,17 +107,22 @@ void Camera::rotate(float amount)
     roll -= amount;
 }
 
-const glm::vec3& Camera::getPosition() const
+const glm::vec3& Camera::get_position() const
 {
     return position;
 }
 
-float Camera::getNear() const
+float Camera::get_near() const
 {
     return near;
 }
 
-float Camera::getFar() const
+float Camera::get_far() const
 {
     return far;
+}
+
+glm::vec3 Camera::get_euler() const
+{
+    return glm::vec3(pitch, yaw, roll);
 }

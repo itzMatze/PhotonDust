@@ -3,6 +3,7 @@ project(PathTracerGPU)
 set(CMAKE_CXX_STANDARD 23)
 
 set(SOURCE_FILES src/main.cpp src/Camera.cpp src/EventHandler.cpp src/Window.cpp src/UI.cpp
+src/SettingsCache.cpp
 src/vk/CommandPool.cpp src/vk/DescriptorSetHandler.cpp src/vk/ExtensionsHandler.cpp
 src/vk/Instance.cpp src/vk/LogicalDevice.cpp src/vk/PhysicalDevice.cpp
 src/vk/Pipeline.cpp src/vk/RenderPass.cpp src/vk/Swapchain.cpp

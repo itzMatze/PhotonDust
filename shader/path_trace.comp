@@ -181,7 +181,7 @@ vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albe
     return vec4(specular, 1.0);
 }
 
-void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, inout vec4 emission, inout vec4 attenuation, out vec3 l)
+void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, in float t, inout vec4 emission, inout vec4 attenuation, out vec3 l)
 {
     // object does not have material, make it fully diffuse with the vertex color
     if (mrd.mat_idx < 0)
@@ -214,6 +214,8 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
             vertex.normal = -vertex.normal;
             ref_idx_one = ref_idx_mat;
             ref_idx_two = ref_idx_air;
+            // simplified Beer-Lambert for attenuation
+            attenuation *= color * exp(-t);
         }
         float F = fresnel_schlick(dot(v, vertex.normal), ref_idx_one, ref_idx_two);
         l = refract(-v, vertex.normal, ref_idx_one / ref_idx_two);
@@ -284,7 +286,7 @@ void main()
             vertex = interpolate_attributes(mrd, primitive_idx, bary);
             vec3 v = -dir;
             p = p + dir * t;
-            apply_surface_parameters(mrd, vertex, v, wavelength, emission, attenuation, dir);
+            apply_surface_parameters(mrd, vertex, v, wavelength, t, emission, attenuation, dir);
             if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view)
             {
                 exposure = 1.0;

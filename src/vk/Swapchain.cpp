@@ -4,7 +4,7 @@
 
 namespace ve
 {
-    Swapchain::Swapchain(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage) : vmc(vmc), vcc(vcc), storage(storage), extent(choose_extent()), surface_format(choose_surface_format()), depth_format(choose_depth_format()), render_pass(vmc, surface_format.format, depth_format)
+    Swapchain::Swapchain(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage) : vmc(vmc), vcc(vcc), storage(storage), render_pass(vmc)
     {}
 
     const vk::SwapchainKHR& Swapchain::get() const
@@ -29,11 +29,43 @@ namespace ve
 
     void Swapchain::construct(bool vsync)
     {
+        construct(vsync, true);
+    }
+
+    void Swapchain::destruct()
+    {
+        destruct(true);
+    }
+
+    void Swapchain::recreate(bool vsync)
+    {
+        destruct(false);
+        construct(vsync, false);
+    }
+
+    void Swapchain::construct(bool vsync, bool full)
+    {
         extent = choose_extent();
         surface_format = choose_surface_format();
+        depth_format = choose_depth_format();
+        if (full) render_pass.construct(surface_format.format, depth_format);
         swapchain = create_swapchain(vsync);
         depth_buffer = storage.add_image(extent.width, extent.height, vk::ImageUsageFlagBits::eDepthStencilAttachment, depth_format, vk::SampleCountFlagBits::e1, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics});
         create_framebuffers();
+    }
+
+    void Swapchain::destruct(bool full)
+    {
+        for (auto& framebuffer : framebuffers) vmc.logical_device.get().destroyFramebuffer(framebuffer);
+        framebuffers.clear();
+        for (auto& image_view : image_views) vmc.logical_device.get().destroyImageView(image_view);
+        image_views.clear();
+        storage.destroy_image(depth_buffer);
+        vmc.logical_device.get().destroySwapchainKHR(swapchain);
+        if (full)
+        {
+            render_pass.destruct();
+        }
     }
 
     vk::SwapchainKHR Swapchain::create_swapchain(bool vsync)
@@ -107,20 +139,6 @@ namespace ve
             fbci.layers = 1;
 
             framebuffers.push_back(vmc.logical_device.get().createFramebuffer(fbci));
-        }
-    }
-
-    void Swapchain::self_destruct(bool full)
-    {
-        for (auto& framebuffer : framebuffers) vmc.logical_device.get().destroyFramebuffer(framebuffer);
-        framebuffers.clear();
-        for (auto& image_view : image_views) vmc.logical_device.get().destroyImageView(image_view);
-        image_views.clear();
-        storage.destroy_image(depth_buffer);
-        vmc.logical_device.get().destroySwapchainKHR(swapchain);
-        if (full)
-        {
-            render_pass.self_destruct();
         }
     }
 

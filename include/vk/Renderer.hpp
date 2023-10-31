@@ -11,8 +11,9 @@ namespace ve
     {
     public:
         Renderer(const VulkanMainContext& vmc, Storage& storage);
-        void construct(AppState& app_state, const RenderPass& render_pass);
-        void self_destruct();
+        void setup_storage(AppState& app_state);
+        void construct(const RenderPass& render_pass);
+        void destruct();
         void render(vk::CommandBuffer& cb, AppState& app_state, uint32_t read_only_image, const vk::Framebuffer& framebuffer, const vk::RenderPass& render_pass);
     private:
         const VulkanMainContext& vmc;

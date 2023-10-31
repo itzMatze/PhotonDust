@@ -37,7 +37,7 @@ namespace ve
             }
         }
 
-        void self_destruct()
+        void destruct()
         {
             vmaDestroyBuffer(vmc.va, buffer, vmaa);
         }

@@ -20,7 +20,7 @@ namespace ve
         void add_descriptor(uint32_t set, uint32_t binding, const Buffer& buffer);
         // third, construct the descriptor set
         void construct();
-        void self_destruct();
+        void destruct();
         const std::vector<vk::DescriptorSetLayout>& get_layouts() const;
         const std::vector<vk::DescriptorSet>& get_sets() const;
 

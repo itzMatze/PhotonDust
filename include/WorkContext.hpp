@@ -23,7 +23,8 @@ namespace ve
     {
     public:
         WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state);
-        void self_destruct();
+        void construct(AppState& app_state);
+        void destruct();
         void reload_shaders();
         void load_scene(const std::string& filename);
         void draw_frame(AppState& app_state);

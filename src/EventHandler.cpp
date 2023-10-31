@@ -3,7 +3,7 @@
 #include <limits>
 #include "backends/imgui_impl_sdl2.h"
 
-EventHandler::EventHandler() : io(ImGui::GetIO()), pressed_keys(get_idx(Key::Size), false), released_keys(get_idx(Key::Size), false)
+EventHandler::EventHandler() : pressed_keys(get_idx(Key::Size), false), released_keys(get_idx(Key::Size), false)
 {
     for (uint32_t i = 0; i < SDL_NumJoysticks(); ++i)
     {
@@ -18,7 +18,7 @@ EventHandler::EventHandler() : io(ImGui::GetIO()), pressed_keys(get_idx(Key::Siz
 void EventHandler::dispatch_event(SDL_Event e)
 {
     ImGui_ImplSDL2_ProcessEvent(&e);
-    if (io.WantCaptureMouse || io.WantCaptureKeyboard)
+    if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard)
     {
         return;
     }

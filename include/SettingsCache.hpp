@@ -23,7 +23,7 @@ public:
         friend std::ostream& operator<<(std::ostream& os, const Data& data);
     } data;
 
-    SettingsCache() = default;
+    SettingsCache();
     bool load_cache();
     bool save_cache();
 };

@@ -10,7 +10,7 @@ namespace ve
         CommandPool() = default;
         CommandPool(const vk::Device& logical_device, uint32_t queue_family_idx);
         std::vector<vk::CommandBuffer> create_command_buffers(uint32_t count);
-        void self_destruct();
+        void destruct();
 
     private:
         vk::Device device;

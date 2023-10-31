@@ -25,7 +25,7 @@ namespace ve
         return device.allocateCommandBuffers(cbai);
     }
 
-    void CommandPool::self_destruct()
+    void CommandPool::destruct()
     {
         device.destroyCommandPool(command_pool);
     }

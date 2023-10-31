@@ -22,7 +22,8 @@ namespace ve
     class PhysicalDevice
     {
     public:
-        PhysicalDevice(const Instance& instance, const std::optional<vk::SurfaceKHR>& surface);
+        PhysicalDevice() = default;
+        void construct(const Instance& instance, const std::optional<vk::SurfaceKHR>& surface);
         vk::PhysicalDevice get() const;
         QueueFamilyIndices get_queue_families(const std::optional<vk::SurfaceKHR>& surface) const;
         const std::vector<const char*>& get_extensions() const;

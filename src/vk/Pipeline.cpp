@@ -9,12 +9,6 @@ namespace ve
     Pipeline::Pipeline(const VulkanMainContext& vmc) : vmc(vmc)
     {}
 
-    void Pipeline::self_destruct()
-    {
-        vmc.logical_device.get().destroyPipeline(pipeline);
-        vmc.logical_device.get().destroyPipelineLayout(pipeline_layout);
-    }
-
     void Pipeline::construct(const RenderPass& render_pass, std::optional<vk::DescriptorSetLayout> set_layout, const std::vector<ShaderInfo>& shader_infos, vk::PolygonMode polygon_mode, const std::vector<vk::VertexInputBindingDescription>& binding_descriptions, const std::vector<vk::VertexInputAttributeDescription>& attribute_description, const vk::PrimitiveTopology& primitive_topology, const std::vector<vk::PushConstantRange>& pcrs)
     {
         std::vector<Shader> shaders;
@@ -159,7 +153,7 @@ namespace ve
         VE_CHECK(pipeline_result_value.result, "Failed to create pipeline!");
         pipeline = pipeline_result_value.value;
 
-        for (auto& shader : shaders) shader.self_destruct();
+        for (auto& shader : shaders) shader.destruct();
     }
 
     void Pipeline::construct(vk::DescriptorSetLayout set_layout, const ShaderInfo& shader_info, uint32_t push_constant_byte_size)
@@ -195,7 +189,13 @@ namespace ve
         VE_CHECK(comute_pipeline_result_value.result, "Failed to create compute pipeline!");
         pipeline = comute_pipeline_result_value.value;
 
-        shader.self_destruct();
+        shader.destruct();
+    }
+
+    void Pipeline::destruct()
+    {
+        vmc.logical_device.get().destroyPipeline(pipeline);
+        vmc.logical_device.get().destroyPipelineLayout(pipeline_layout);
     }
 
     const vk::Pipeline& Pipeline::get() const

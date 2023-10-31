@@ -206,7 +206,7 @@ namespace ve
             std::tie(image, vmaa) = create_image(queue_family_indices, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | usage_flags, vk::SampleCountFlagBits::e1, true, format, vk::Extent3D(w, h, 1), layer_count, vmc.va);
             move_buffer_to_image(image, mip_levels);
         }
-        buffer.self_destruct();
+        buffer.destruct();
         // set current layout of this image
         layout = vk::ImageLayout::eTransferDstOptimal;
         if (usage_flags & vk::ImageUsageFlagBits::eSampled)
@@ -262,7 +262,7 @@ namespace ve
         sampler = vmc.logical_device.get().createSampler(sci);
     }
 
-    void Image::self_destruct()
+    void Image::destruct()
     {
         vmc.logical_device.get().destroySampler(sampler);
         vmc.logical_device.get().destroyImageView(view);

@@ -12,7 +12,7 @@ namespace ve
     public:
         Scene(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage);
         void construct();
-        void self_destruct();
+        void destruct();
         void load(const std::string& path);
         uint32_t get_texture_image_count() const;
 

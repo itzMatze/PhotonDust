@@ -22,7 +22,7 @@ namespace ve
         }
     }
 
-    void Synchronization::self_destruct()
+    void Synchronization::destruct()
     {
         device.waitIdle();
         for (auto& s : semaphores) device.destroy(s);

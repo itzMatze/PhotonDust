@@ -11,12 +11,13 @@ namespace ve
     {
     public:
         Swapchain(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage);
-        void self_destruct(bool full);
+        void construct(bool vsync);
+        void destruct();
+        void recreate(bool vsync);
         const vk::SwapchainKHR& get() const;
         const RenderPass& get_render_pass() const;
         vk::Extent2D get_extent() const;
         vk::Framebuffer get_framebuffer(uint32_t idx) const;
-        void construct(bool vsync);
 
     private:
         const VulkanMainContext& vmc;
@@ -38,5 +39,7 @@ namespace ve
         vk::Extent2D choose_extent();
         vk::SurfaceFormatKHR choose_surface_format();
         vk::Format choose_depth_format();
+        void construct(bool vsync, bool full);
+        void destruct(bool full);
     };
 } // namespace ve

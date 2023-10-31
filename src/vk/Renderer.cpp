@@ -5,22 +5,26 @@ namespace ve
     Renderer::Renderer(const VulkanMainContext& vmc, Storage& storage) : vmc(vmc), storage(storage), pipeline(vmc), dsh(vmc, frames_in_flight)
     {}
 
-    void Renderer::construct(AppState& app_state, const RenderPass& render_pass)
+    void Renderer::setup_storage(AppState& app_state)
     {
         // set up textures that will be rendered
         std::vector<unsigned char> initial_image(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
         render_textures.push_back(storage.add_named_image("render_texture_0", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc));
         render_textures.push_back(storage.add_named_image("render_texture_1", initial_image.data(), app_state.render_extent.width, app_state.render_extent.height, false, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc));
+    }
+
+    void Renderer::construct(const RenderPass& render_pass)
+    {
         create_descriptor_set();
         create_pipeline(render_pass);
     }
 
-    void Renderer::self_destruct()
+    void Renderer::destruct()
     {
         for (uint32_t i : render_textures) storage.destroy_image(i);
         render_textures.clear();
-        pipeline.self_destruct();
-        dsh.self_destruct();
+        pipeline.destruct();
+        dsh.destruct();
     }
 
     void Renderer::create_pipeline(const RenderPass& render_pass)

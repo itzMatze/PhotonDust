@@ -19,7 +19,7 @@ namespace ve
     {
     public:
         PathTraceBuilder(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage);
-        void self_destruct();
+        void destruct();
         uint32_t add_blas(vk::CommandBuffer& cb, uint32_t vertex_buffer_id, uint32_t index_buffer_id, const std::vector<uint32_t>& index_offsets, const std::vector<uint32_t>& index_counts, vk::DeviceSize vertex_stride);
         uint32_t add_instance(uint32_t blas_idx, const glm::mat4& M, uint32_t custom_index);
         void update_instance(uint32_t instance_idx, const glm::mat4& M);

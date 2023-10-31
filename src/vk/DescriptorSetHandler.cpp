@@ -120,7 +120,7 @@ namespace ve
         vmc.logical_device.get().updateDescriptorSets(wds_s, {});
     }
 
-    void DescriptorSetHandler::self_destruct()
+    void DescriptorSetHandler::destruct()
     {
         for (auto& dsl : layouts) vmc.logical_device.get().destroyDescriptorSetLayout(dsl);
         layouts.clear();

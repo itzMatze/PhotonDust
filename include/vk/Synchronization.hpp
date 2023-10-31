@@ -22,7 +22,7 @@ namespace ve
         };
 
         Synchronization(const vk::Device& logical_device);
-        void self_destruct();
+        void destruct();
         const vk::Semaphore& get_semaphore(SemaphoreNames name) const;
         const vk::Fence& get_fence(FenceNames name) const;
         void wait_for_fence(FenceNames name) const;

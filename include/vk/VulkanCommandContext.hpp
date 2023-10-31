@@ -8,7 +8,9 @@ namespace ve
     class VulkanCommandContext
     {
     public:
-        VulkanCommandContext(VulkanMainContext& vmc);
+        VulkanCommandContext(const VulkanMainContext& vmc);
+        void construct();
+        void destruct();
         void add_graphics_buffers(uint32_t count);
         void add_compute_buffers(uint32_t count);
         void add_transfer_buffers(uint32_t count);
@@ -19,7 +21,6 @@ namespace ve
         void submit_graphics(const vk::CommandBuffer& cb, bool wait_idle) const;
         void submit_compute(const vk::CommandBuffer& cb, bool wait_idle) const;
         void submit_transfer(const vk::CommandBuffer& cb, bool wait_idle) const;
-        void self_destruct();
 
         const VulkanMainContext& vmc;
         std::vector<CommandPool> command_pools;

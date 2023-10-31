@@ -74,7 +74,6 @@ public:
     void set_released_key(Key key, bool value);
 
 private:
-    ImGuiIO& io;
     std::vector<bool> pressed_keys;
     std::vector<bool> released_keys;
     SDL_GameController* controller = nullptr;

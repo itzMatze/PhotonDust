@@ -15,7 +15,7 @@ namespace ve
     {
     public:
         Shader(const vk::Device& device, const std::string filename, vk::ShaderStageFlagBits shader_stage_flag);
-        void self_destruct();
+        void destruct();
         const vk::ShaderModule get() const;
         const vk::PipelineShaderStageCreateInfo& get_stage_create_info() const;
 

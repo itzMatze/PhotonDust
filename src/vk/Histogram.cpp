@@ -5,19 +5,24 @@ namespace ve
     Histogram::Histogram(const VulkanMainContext& vmc, Storage& storage) : vmc(vmc), storage(storage), pipeline(vmc), dsh(vmc, frames_in_flight)
     {}
 
-    void Histogram::construct(AppState& app_state)
+    void Histogram::setup_storage(AppState& app_state)
     {
         // set up histogram buffer
+        app_state.histogram = std::vector<uint32_t>(app_state.bin_count_per_channel * 3, 0);
         histogram_buffer = storage.add_named_buffer("histogram_buffer", app_state.histogram, vk::BufferUsageFlagBits::eStorageBuffer, false, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute);
+    }
+
+    void Histogram::construct(AppState& app_state)
+    {
         create_descriptor_set();
         create_pipeline(app_state.histogram.size());
     }
 
-    void Histogram::self_destruct()
+    void Histogram::destruct()
     {
         storage.destroy_buffer(histogram_buffer);
-        pipeline.self_destruct();
-        dsh.self_destruct();
+        pipeline.destruct();
+        dsh.destruct();
     }
 
     void Histogram::compute(vk::CommandBuffer& cb, AppState& app_state, uint32_t read_only_image)

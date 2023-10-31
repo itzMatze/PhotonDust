@@ -29,31 +29,41 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 
 namespace ve
 {
-    // create VulkanMainContext without window for non graphical applications
-    VulkanMainContext::VulkanMainContext() : instance({}), physical_device(instance, surface), queue_family_indices(physical_device.get_queue_families(surface)), logical_device(physical_device, queue_family_indices, queues)
-    {
-        create_vma_allocator();
-        setup_debug_messenger();
-        spdlog::info("Created VulkanMainContext");
-    }
-
     // create VulkanMainContext with window for graphical applications
-    VulkanMainContext::VulkanMainContext(const uint32_t width, const uint32_t height) : window(std::make_optional<Window>(width, height)), instance(window->get_required_extensions()), surface(window->create_surface(instance.get())), physical_device(instance, surface), queue_family_indices(physical_device.get_queue_families(surface)), logical_device(physical_device, queue_family_indices, queues)
+    void VulkanMainContext::construct(const uint32_t width, const uint32_t height)
     {
+        window = std::make_optional<Window>(width, height);
+        instance.construct(window->get_required_extensions());
+        surface = window->create_surface(instance.get());
+        physical_device.construct(instance, surface);
+        queue_family_indices = physical_device.get_queue_families(surface);
+        logical_device.construct(physical_device, queue_family_indices, queues);
         create_vma_allocator();
         setup_debug_messenger();
         spdlog::info("Created VulkanMainContext");
     }
 
-    void VulkanMainContext::self_destruct()
+    // create VulkanMainContext without window for non graphical applications
+    void VulkanMainContext::construct()
+    {
+        instance.construct({});
+        physical_device.construct(instance, surface);
+        queue_family_indices = physical_device.get_queue_families(surface);
+        logical_device.construct(physical_device, queue_family_indices, queues);
+        create_vma_allocator();
+        setup_debug_messenger();
+        spdlog::info("Created VulkanMainContext");
+    }
+
+    void VulkanMainContext::destruct()
     {
         vmaDestroyAllocator(va);
         if (surface.has_value()) instance.get().destroySurfaceKHR(surface.value());
-        logical_device.self_destruct();
+        logical_device.destruct();
         auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) instance.get().getProcAddr("vkDestroyDebugUtilsMessengerEXT");
         func(instance.get(), debug_messenger, nullptr);
-        instance.self_destruct();
-        if (window.has_value()) window->self_destruct();
+        instance.destruct();
+        if (window.has_value()) window->destruct();
         spdlog::info("Destroyed VulkanMainContext");
     }
 

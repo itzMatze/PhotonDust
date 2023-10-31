@@ -16,7 +16,7 @@ namespace ve
         timestamp_period = pdp.limits.timestampPeriod;
     }
 
-    void DeviceTimer::self_destruct()
+    void DeviceTimer::destruct()
     {
         vmc.logical_device.get().destroyQueryPool(qp);
     }

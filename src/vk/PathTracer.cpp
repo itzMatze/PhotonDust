@@ -2,7 +2,10 @@
 
 namespace ve
 {
-    PathTracer::PathTracer(const VulkanMainContext& vmc, Storage& storage, AppState& app_state) : vmc(vmc), storage(storage), pipeline(vmc), dsh(vmc, frames_in_flight)
+    PathTracer::PathTracer(const VulkanMainContext& vmc, Storage& storage) : vmc(vmc), storage(storage), pipeline(vmc), dsh(vmc, frames_in_flight)
+    {}
+
+    void PathTracer::setup_storage(AppState& app_state)
     {
         // set up images for path tracing
         std::vector<unsigned char> initial_image(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
@@ -20,19 +23,19 @@ namespace ve
         for (uint32_t i : path_trace_images) storage.get_image(i).transition_image_layout(vcc, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, vk::AccessFlagBits::eNone, vk::AccessFlagBits::eNone);
     }
 
-    void PathTracer::self_destruct()
+    void PathTracer::destruct()
     {
         for (uint32_t i : path_trace_images) storage.destroy_image(i);
         path_trace_images.clear();
         for (uint32_t i : path_trace_buffers) storage.destroy_buffer(i);
         path_trace_buffers.clear();
-        pipeline.self_destruct();
-        dsh.self_destruct();
+        pipeline.destruct();
+        dsh.destruct();
     }
 
     void PathTracer::reload_shaders()
     {
-        pipeline.self_destruct();
+        pipeline.destruct();
         create_pipeline();
     }
 
@@ -41,8 +44,8 @@ namespace ve
         scene_texture_count = scene_texture_image_count;
         if (!init)
         {
-            dsh.self_destruct();
-            pipeline.self_destruct();
+            dsh.destruct();
+            pipeline.destruct();
         }
         create_descriptor_set();
         create_pipeline();

@@ -18,8 +18,9 @@ namespace ve
     class LogicalDevice
     {
     public:
-        LogicalDevice(const PhysicalDevice& p_device, const QueueFamilyIndices& queue_family_indices, std::unordered_map<QueueIndex, vk::Queue>& queues);
-        void self_destruct();
+        LogicalDevice() = default;
+        void construct(const PhysicalDevice& p_device, const QueueFamilyIndices& queue_family_indices, std::unordered_map<QueueIndex, vk::Queue>& queues);
+        void destruct();
         const vk::Device& get() const;
 
     private:

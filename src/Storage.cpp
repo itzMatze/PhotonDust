@@ -11,7 +11,7 @@ namespace ve
     {
         if (buffers.at(idx).has_value())
         {
-            buffers.at(idx).value().self_destruct();
+            buffers.at(idx).value().destruct();
             buffers.at(idx).reset();
         }
         else
@@ -24,7 +24,7 @@ namespace ve
     {
         if (images.at(idx).has_value())
         {
-            images.at(idx).value().self_destruct();
+            images.at(idx).value().destruct();
             images.at(idx).reset();
         }
         else
@@ -47,12 +47,12 @@ namespace ve
     {
         for (auto& b : buffers)
         {
-            if (b.has_value()) b.value().self_destruct();
+            if (b.has_value()) b.value().destruct();
         }
         buffers.clear();
         for (auto& i : images)
         {
-            if (i.has_value()) i.value().self_destruct();
+            if (i.has_value()) i.value().destruct();
         }
         images.clear();
         buffer_names.clear();

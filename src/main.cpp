@@ -22,16 +22,20 @@ constexpr float aspect_ratio = float(render_width) / float(render_height);
 class MainContext
 {
 public:
-    MainContext() : app_state{.render_extent = vk::Extent2D(render_width, render_height), .window_extent = vk::Extent2D(aspect_ratio * 1000, 1000), .aspect_ratio = aspect_ratio, .cam = Camera(60.0f, aspect_ratio)}, vmc(app_state.window_extent.width, app_state.window_extent.height), vcc(vmc), wc(vmc, vcc, app_state)
+    MainContext() : app_state{.render_extent = vk::Extent2D(render_width, render_height), .window_extent = vk::Extent2D(aspect_ratio * 1000, 1000), .aspect_ratio = aspect_ratio, .cam = Camera(60.0f, aspect_ratio)}, vcc(vmc), wc(vmc, vcc, app_state)
     {
+        if (sc.data.headless) vmc.construct();
+        else vmc.construct(app_state.window_extent.width, app_state.window_extent.height);
+        vcc.construct();
+        wc.construct(app_state);
         app_state.devicetimings.resize(ve::DeviceTimer::TIMER_COUNT, 0.0f);
     }
 
     ~MainContext()
     {
-        wc.self_destruct();
-        vcc.self_destruct();
-        vmc.self_destruct();
+        wc.destruct();
+        vcc.destruct();
+        vmc.destruct();
         spdlog::info("Destroyed MainContext");
     }
 
@@ -87,12 +91,12 @@ public:
     }
 
 private:
+    SettingsCache sc;
     ve::AppState app_state;
     ve::VulkanMainContext vmc;
     ve::VulkanCommandContext vcc;
     ve::WorkContext wc;
     EventHandler eh;
-    SettingsCache sc;
     float move_amount;
     float move_speed = 20.0f;
 

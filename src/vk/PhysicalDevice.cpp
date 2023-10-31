@@ -6,7 +6,7 @@
 
 namespace ve
 {
-    PhysicalDevice::PhysicalDevice(const Instance& instance, const std::optional<vk::SurfaceKHR>& surface)
+    void PhysicalDevice::construct(const Instance& instance, const std::optional<vk::SurfaceKHR>& surface)
     {
         const std::vector<const char*> required_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
         const std::vector<const char*> optional_extensions{VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};

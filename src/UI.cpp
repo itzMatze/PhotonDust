@@ -14,7 +14,10 @@ namespace ve
     constexpr float update_weight = 0.1f;
     constexpr ImU32 color_data[3] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000 };
 
-    UI::UI(const VulkanMainContext& vmc, const RenderPass& render_pass, uint32_t frames) : vmc(vmc), frametime_values(plot_value_count, 0.0f), devicetimings(DeviceTimer::TIMER_COUNT, 0.0f)
+    UI::UI(const VulkanMainContext& vmc) : vmc(vmc), frametime_values(plot_value_count, 0.0f), devicetimings(DeviceTimer::TIMER_COUNT, 0.0f)
+    {}
+
+    void UI::construct(VulkanCommandContext& vcc, const RenderPass& render_pass, uint32_t frames)
     {
         for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i) devicetiming_values.push_back(FixVector<float>(plot_value_count, 0.0f));
 
@@ -62,23 +65,20 @@ namespace ve
 
         ImGui_ImplVulkan_Init(&ii, render_pass.get());
         ImGui::StyleColorsDark();
+
+        vk::CommandBuffer cb = vcc.get_one_time_graphics_buffer();
+        ImGui_ImplVulkan_CreateFontsTexture(cb);
+        vcc.submit_graphics(cb, true);
+        ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
-    void UI::self_destruct()
+    void UI::destruct()
     {
         vmc.logical_device.get().destroyDescriptorPool(imgui_pool);
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplSDL2_Shutdown();
         ImPlot::DestroyContext();
         ImGui::DestroyContext();
-    }
-
-    void UI::upload_font_textures(VulkanCommandContext& vcc)
-    {
-        vk::CommandBuffer cb = vcc.get_one_time_graphics_buffer();
-        ImGui_ImplVulkan_CreateFontsTexture(cb);
-        vcc.submit_graphics(cb, true);
-        ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
     void UI::draw(vk::CommandBuffer& cb, AppState& app_state)

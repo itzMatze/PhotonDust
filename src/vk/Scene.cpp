@@ -18,9 +18,9 @@ namespace ve
         vcc.submit_compute(cb, true);
     }
 
-    void Scene::self_destruct()
+    void Scene::destruct()
     {
-        path_tracer.self_destruct();
+        path_tracer.destruct();
         storage.destroy_buffer(model_mrd_indices_buffer);
         storage.destroy_buffer(mesh_render_data_buffer);
         storage.destroy_buffer(light_buffer);

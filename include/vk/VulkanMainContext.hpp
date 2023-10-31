@@ -12,9 +12,10 @@ namespace ve
     class VulkanMainContext
     {
     public:
-        explicit VulkanMainContext();
-        VulkanMainContext(const uint32_t width, const uint32_t height);
-        void self_destruct();
+        VulkanMainContext() = default;
+        void construct();
+        void construct(const uint32_t width, const uint32_t height);
+        void destruct();
         std::vector<vk::SurfaceFormatKHR> get_surface_formats() const;
         std::vector<vk::PresentModeKHR> get_surface_present_modes() const;
         vk::SurfaceCapabilitiesKHR get_surface_capabilities() const;

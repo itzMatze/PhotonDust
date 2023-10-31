@@ -43,6 +43,11 @@ std::ostream& operator<<(std::ostream& os, const SettingsCache::Data& data)
     return os;
 }
 
+SettingsCache::SettingsCache()
+{
+    load_cache();
+}
+
 bool SettingsCache::load_cache()
 {
     if (!std::filesystem::exists(cache_filename)) return false;

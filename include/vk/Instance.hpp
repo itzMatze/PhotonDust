@@ -10,8 +10,9 @@ namespace ve
     class Instance
     {
     public:
-        Instance(std::vector<const char*> required_extensions);
-        void self_destruct();
+        Instance() = default;
+        void construct(std::vector<const char*> required_extensions);
+        void destruct();
         const vk::Instance& get() const;
         const std::vector<const char*>& get_missing_extensions() const;
         std::vector<vk::PhysicalDevice> get_physical_devices() const;

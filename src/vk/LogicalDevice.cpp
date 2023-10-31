@@ -9,7 +9,7 @@
 
 namespace ve
 {
-    LogicalDevice::LogicalDevice(const PhysicalDevice& p_device, const QueueFamilyIndices& queue_family_indices, std::unordered_map<QueueIndex, vk::Queue>& queues)
+    void LogicalDevice::construct(const PhysicalDevice& p_device, const QueueFamilyIndices& queue_family_indices, std::unordered_map<QueueIndex, vk::Queue>& queues)
     {
         std::vector<vk::DeviceQueueCreateInfo> qci_s;
         std::set<uint32_t> unique_queue_families = {queue_family_indices.graphics, queue_family_indices.compute, queue_family_indices.transfer, queue_family_indices.present};
@@ -66,7 +66,7 @@ namespace ve
         VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
     }
 
-    void LogicalDevice::self_destruct()
+    void LogicalDevice::destruct()
     {
         device.destroy();
     }

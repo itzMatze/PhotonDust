@@ -45,7 +45,7 @@ namespace ve
         };
 
         DeviceTimer(const VulkanMainContext& vmc, VulkanCommandContext& vcc);
-        void self_destruct();
+        void destruct();
         void reset_all(vk::CommandBuffer& cb);
         void reset(vk::CommandBuffer& cb, const std::vector<TimerNames>& timers);
         void start(vk::CommandBuffer& cb, TimerNames t, vk::PipelineStageFlagBits stage);

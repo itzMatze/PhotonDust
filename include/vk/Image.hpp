@@ -21,7 +21,7 @@ namespace ve
         // used to create depth buffer and multisampling color attachment
         Image(const VulkanMainContext& vmc, const VulkanCommandContext& vcc, uint32_t width, uint32_t height, vk::ImageUsageFlags usage, vk::Format format, vk::SampleCountFlagBits sample_count, bool use_mip_maps, uint32_t base_mip_map_lvl, const std::vector<uint32_t>& queue_family_indices, bool image_view_required = true, uint32_t layer_count = 1);
         void create_sampler(vk::Filter filter = vk::Filter::eLinear, vk::SamplerAddressMode sampler_address_mode = vk::SamplerAddressMode::eRepeat, bool enable_anisotropy = true);
-        void self_destruct();
+        void destruct();
         void transition_image_layout(VulkanCommandContext& vcc, vk::ImageLayout new_layout, vk::PipelineStageFlags src_stage_flags, vk::PipelineStageFlags dst_stage_flags, vk::AccessFlags src_access_flags, vk::AccessFlags dst_access_flags);
         void save_to_file(VulkanCommandContext& vcc);
         vk::DeviceSize get_byte_size() const;

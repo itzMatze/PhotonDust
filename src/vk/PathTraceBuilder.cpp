@@ -4,7 +4,7 @@ namespace ve
 {
     PathTraceBuilder::PathTraceBuilder(const VulkanMainContext& vmc, VulkanCommandContext& vcc, Storage& storage) : vmc(vmc), vcc(vcc), storage(storage) {}
 
-    void PathTraceBuilder::self_destruct()
+    void PathTraceBuilder::destruct()
     {
         vmc.logical_device.get().destroyAccelerationStructureKHR(topLevelAS.handle);
         storage.destroy_buffer(topLevelAS.buffer);

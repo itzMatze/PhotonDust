@@ -32,7 +32,7 @@ namespace ve
         pssci.pName = "main";
     }
 
-    void Shader::self_destruct()
+    void Shader::destruct()
     {
         device.destroyShaderModule(shader_module);
     }

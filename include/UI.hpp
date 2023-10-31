@@ -40,9 +40,9 @@ namespace ve
     class UI
     {
 	public:
-		UI(const VulkanMainContext& vmc, const RenderPass& render_pass, uint32_t frames);
-        void self_destruct();
-		void upload_font_textures(VulkanCommandContext& vcc);
+		UI(const VulkanMainContext& vmc);
+        void construct(VulkanCommandContext& vcc, const RenderPass& render_pass, uint32_t frames);
+        void destruct();
 		void draw(vk::CommandBuffer& cb, AppState& app_state);
 	private:
         const VulkanMainContext& vmc;

@@ -4,45 +4,50 @@
 
 namespace ve
 {
-    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc, swapchain.get_render_pass(), frames_in_flight), path_tracer(vmc, storage, app_state), renderer(vmc, storage), histogram(vmc, storage)
+    WorkContext::WorkContext(const VulkanMainContext& vmc, VulkanCommandContext& vcc, AppState& app_state) : vmc(vmc), vcc(vcc), storage(vmc, vcc), swapchain(vmc, vcc, storage), scene(vmc, vcc, storage), ui(vmc), path_tracer(vmc, storage), renderer(vmc, storage), histogram(vmc, storage)
+    {}
+
+    void WorkContext::construct(AppState& app_state)
     {
         vcc.add_graphics_buffers(frames_in_flight);
         vcc.add_compute_buffers(1);
         vcc.add_transfer_buffers(1);
-        ui.upload_font_textures(vcc);
+        path_tracer.setup_storage(app_state);
+        renderer.setup_storage(app_state);
+        histogram.setup_storage(app_state);
+        swapchain.construct(app_state.vsync);
+        app_state.window_extent = swapchain.get_extent();
+        ui.construct(vcc, swapchain.get_render_pass(), frames_in_flight);
         for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
             timers.emplace_back(vmc, vcc);
             syncs.emplace_back(vmc.logical_device.get());
         }
-        swapchain.construct(app_state.vsync);
-        app_state.window_extent = swapchain.get_extent();
 
         // set up uniform buffer
         uniform_buffer = storage.add_named_buffer("uniform_buffer", sizeof(Camera::Data), vk::BufferUsageFlagBits::eUniformBuffer, false, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer);
 
         path_tracer.construct(vcc);
-        app_state.histogram.resize(app_state.bin_count_per_channel * 3, 0);
+        renderer.construct(swapchain.get_render_pass());
         histogram.construct(app_state);
-        renderer.construct(app_state, swapchain.get_render_pass());
 
         spdlog::info("Created WorkContext");
     }
 
-    void WorkContext::self_destruct()
+    void WorkContext::destruct()
     {
         vmc.logical_device.get().waitIdle();
-        for (auto& sync : syncs) sync.self_destruct();
+        for (auto& sync : syncs) sync.destruct();
         syncs.clear();
-        for (auto& timer : timers) timer.self_destruct();
+        for (auto& timer : timers) timer.destruct();
         timers.clear();
         storage.destroy_buffer(uniform_buffer);
-        ui.self_destruct();
-        scene.self_destruct();
-        swapchain.self_destruct(true);
-        renderer.self_destruct();
-        histogram.self_destruct();
-        path_tracer.self_destruct();
+        ui.destruct();
+        scene.destruct();
+        swapchain.destruct();
+        renderer.destruct();
+        histogram.destruct();
+        path_tracer.destruct();
         spdlog::info("Destroyed WorkContext");
     }
 
@@ -57,7 +62,7 @@ namespace ve
         bool init = !scene.loaded;
         HostTimer timer;
         vmc.logical_device.get().waitIdle();
-        if (scene.loaded) scene.self_destruct();
+        if (scene.loaded) scene.destruct();
         scene.load(std::string("../assets/scenes/") + filename);
         scene.construct();
         spdlog::info("Loading scene took: {} ms", (timer.elapsed<std::milli>()));
@@ -98,8 +103,7 @@ namespace ve
     vk::Extent2D WorkContext::recreate_swapchain(bool vsync)
     {
         vmc.logical_device.get().waitIdle();
-        swapchain.self_destruct(false);
-        swapchain.construct(vsync);
+        swapchain.recreate(vsync);
         return swapchain.get_extent();
     }
 
@@ -112,8 +116,8 @@ namespace ve
             if (app_state.bin_count_changed)
             {
                 app_state.bin_count_changed = false;
-                app_state.histogram = std::vector<uint32_t>(app_state.bin_count_per_channel * 3, 0);
-                histogram.self_destruct();
+                histogram.destruct();
+                histogram.setup_storage(app_state);
                 histogram.construct(app_state);
             }
             if (app_state.sample_count % app_state.histogram_update_rate == 0) histogram.compute(compute_cb, app_state, read_only_image);

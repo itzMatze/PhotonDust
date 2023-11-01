@@ -214,8 +214,8 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
             vertex.normal = -vertex.normal;
             ref_idx_one = ref_idx_mat;
             ref_idx_two = ref_idx_air;
-            // simplified Beer-Lambert for attenuation
-            attenuation *= color * exp(-t);
+            // simplified Beer-Lambert for attenuation; use opacity as molar attenuation coefficient
+            attenuation *= vec4(color.rgb * exp(-t * (1.0 - color.a)), 1.0);
         }
         float F = fresnel_schlick(dot(v, vertex.normal), ref_idx_one, ref_idx_two);
         l = refract(-v, vertex.normal, ref_idx_one / ref_idx_two);

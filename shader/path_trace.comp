@@ -251,7 +251,7 @@ Vertex interpolate_attributes(in MeshRenderData mrd, in int primitive_idx, in ve
     return v;
 }
 
-#define PATH_LENGTH 8
+#define MAX_PATH_LENGTH 128
 
 void main()
 {
@@ -278,7 +278,7 @@ void main()
     vec2 bary = vec2(0.0);
     Vertex vertex;
     MeshRenderData mrd;
-    for (uint i = 0; i < PATH_LENGTH; ++i)
+    for (uint i = 0; i < MAX_PATH_LENGTH; ++i)
     {
         if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
         {
@@ -300,6 +300,10 @@ void main()
             vertex.tex = vec2(0.0);
             break;
         }
+        // russian roulette
+        float survival_prob = min(max(max(attenuation.r, attenuation.g), attenuation.b) + 0.8, 1.0);
+        if (pcg_random_state() < survival_prob) attenuation /= survival_prob;
+        else break;
     }
     if (pc.attenuation_view) out_color = attenuation;
     else if (pc.emission_view) out_color = emission;

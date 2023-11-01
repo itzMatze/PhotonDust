@@ -11,7 +11,7 @@ public:
     Camera(float fov, float aspect_ratio);
     Camera(float fov, float aspect_ratio, float sensor_width, float focal_length, float exposure, glm::vec3 pos, glm::vec3 euler);
     void update_data();
-    void update(float time_diff);
+    void update();
     void translate(glm::vec3 v);
     void on_mouse_move(float xRel, float yRel);
     void move_front(float amount);

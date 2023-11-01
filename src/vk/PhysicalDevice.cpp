@@ -69,9 +69,9 @@ namespace ve
         QueueFamilyIndices scores(0);
         for (uint32_t i = 0; i < queue_families.size(); ++i)
         {
+            vk::Bool32 present_support = false;
             if (surface.has_value())
             {
-                vk::Bool32 present_support = false;
                 present_support = physical_device.getSurfaceSupportKHR(i, surface.value());
                 // take what we get for present queue, but ideally present and graphics queue are the same
                 if (present_support && scores.present == 0)
@@ -79,16 +79,16 @@ namespace ve
                     scores.present = 1;
                     queue_family_indices.present = i;
                 }
-                if (scores.graphics < get_queue_score(queue_families[i], vk::QueueFlagBits::eGraphics))
+            }
+            if (scores.graphics < get_queue_score(queue_families[i], vk::QueueFlagBits::eGraphics))
+            {
+                if (present_support && scores.present < 2)
                 {
-                    if (present_support && scores.present < 2)
-                    {
-                        scores.present = 2;
-                        queue_family_indices.present = i;
-                    }
-                    scores.graphics = get_queue_score(queue_families[i], vk::QueueFlagBits::eGraphics);
-                    queue_family_indices.graphics = i;
+                    scores.present = 2;
+                    queue_family_indices.present = i;
                 }
+                scores.graphics = get_queue_score(queue_families[i], vk::QueueFlagBits::eGraphics);
+                queue_family_indices.graphics = i;
             }
             if (scores.compute < get_queue_score(queue_families[i], vk::QueueFlagBits::eCompute))
             {

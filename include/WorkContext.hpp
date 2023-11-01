@@ -27,6 +27,7 @@ namespace ve
         void destruct();
         void reload_shaders();
         void load_scene(const std::string& filename);
+        void headless_next_sample(AppState& app_state);
         void draw_frame(AppState& app_state);
         vk::Extent2D recreate_swapchain(bool vsync);
 
@@ -34,14 +35,14 @@ namespace ve
         const VulkanMainContext& vmc;
         VulkanCommandContext& vcc;
         Storage storage;
-        Swapchain swapchain;
+        std::optional<Swapchain> swapchain;
         Scene scene;
-        UI ui;
+        std::optional<UI> ui;
         std::vector<Synchronization> syncs;
         std::vector<DeviceTimer> timers;
         PathTracer path_tracer;
-        Renderer renderer;
-        Histogram histogram;
+        std::optional<Renderer> renderer;
+        std::optional<Histogram> histogram;
         uint32_t uniform_buffer;
         Camera::Data old_cam_data;
 

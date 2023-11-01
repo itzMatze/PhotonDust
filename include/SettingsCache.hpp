@@ -11,6 +11,8 @@ class SettingsCache
 public:
     struct Data
     {
+        bool headless;
+        uint32_t sample_count;
         std::string scene_name;
         // camera data
         glm::vec3 pos;
@@ -24,6 +26,10 @@ public:
     } data;
 
     SettingsCache();
-    bool load_cache();
+    void load_cache();
     bool save_cache();
+    bool is_cache_loaded() { return cache_loaded; }
+
+private:
+    bool cache_loaded = false;
 };

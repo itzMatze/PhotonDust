@@ -14,6 +14,8 @@ std::istream& operator>>(std::istream& is, SettingsCache::Data& data)
         std::getline(is, buffer);
         return buffer;
     };
+    data.headless = get() == "0" ? false : true;
+    data.sample_count = std::stoi(get());
     data.scene_name = get();
     data.pos.x = std::stof(get());
     data.pos.y = std::stof(get());
@@ -30,6 +32,8 @@ std::istream& operator>>(std::istream& is, SettingsCache::Data& data)
 std::ostream& operator<<(std::ostream& os, const SettingsCache::Data& data)
 {
     auto print_float = [&os](float f) { os << std::fixed << std::setprecision(10) << f << '\n'; };
+    os << 0 << '\n';
+    os << 0 << '\n';
     os << data.scene_name << '\n';
     print_float(data.pos.x);
     print_float(data.pos.y);
@@ -48,14 +52,22 @@ SettingsCache::SettingsCache()
     load_cache();
 }
 
-bool SettingsCache::load_cache()
+void SettingsCache::load_cache()
 {
-    if (!std::filesystem::exists(cache_filename)) return false;
+    if (!std::filesystem::exists(cache_filename))
+    {
+        cache_loaded = false;
+        return;
+    }
     std::ifstream file(cache_filename.data());
-    if (!file.is_open()) return false;
+    if (!file.is_open())
+    {
+        cache_loaded = false;
+        return;
+    }
     file >> data;
     file.close();
-    return true;
+    cache_loaded = true;
 }
 
 bool SettingsCache::save_cache()

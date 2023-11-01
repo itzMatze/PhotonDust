@@ -14,8 +14,9 @@ namespace ve
         std::vector<vk::DeviceQueueCreateInfo> qci_s;
         std::set<uint32_t> unique_queue_families = {queue_family_indices.graphics, queue_family_indices.compute, queue_family_indices.transfer, queue_family_indices.present};
         float queue_prio = 1.0f;
-        for (uint32_t queue_family : unique_queue_families)
+        for (int32_t queue_family : unique_queue_families)
         {
+            if (queue_family == uint32_t(-1)) continue;
             vk::DeviceQueueCreateInfo qci{};
             qci.sType = vk::StructureType::eDeviceQueueCreateInfo;
             qci.queueFamilyIndex = queue_family;
@@ -62,7 +63,7 @@ namespace ve
         queues.emplace(QueueIndex::Graphics, device.getQueue(queue_family_indices.graphics, 0));
         queues.emplace(QueueIndex::Compute, device.getQueue(queue_family_indices.compute, 0));
         queues.emplace(QueueIndex::Transfer, device.getQueue(queue_family_indices.transfer, 0));
-        queues.emplace(QueueIndex::Present, device.getQueue(queue_family_indices.present, 0));
+        if (queue_family_indices.present != uint32_t(-1)) queues.emplace(QueueIndex::Present, device.getQueue(queue_family_indices.present, 0));
         VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
     }
 

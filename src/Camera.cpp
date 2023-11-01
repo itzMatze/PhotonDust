@@ -37,7 +37,7 @@ void Camera::update_data()
     data.w = w;
 }
 
-void Camera::update(float time_diff)
+void Camera::update()
 {
     constexpr bool use_free_cam = false;
     // rotate initial coordinate system to camera orientation

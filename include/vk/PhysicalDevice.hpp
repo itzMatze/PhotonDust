@@ -9,7 +9,7 @@
 namespace ve
 {
     struct QueueFamilyIndices {
-        QueueFamilyIndices() : graphics(0), compute(0), transfer(0), present(0)
+        QueueFamilyIndices() : graphics(uint32_t(-1)), compute(uint32_t(-1)), transfer(uint32_t(-1)), present(uint32_t(-1))
         {}
         QueueFamilyIndices(uint32_t value) : graphics(value), compute(value), transfer(value), present(value)
         {}

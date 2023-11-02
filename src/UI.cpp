@@ -136,6 +136,7 @@ namespace ve
         ImGui::Checkbox("Emission view", &(app_state.emission_view));
         ImGui::Checkbox("Normal view", &(app_state.normal_view));
         ImGui::Checkbox("Texel view", &(app_state.tex_view));
+        ImGui::Checkbox("Path Depth view", &(app_state.path_depth_view));
         // path tracing
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "Path Tracing");

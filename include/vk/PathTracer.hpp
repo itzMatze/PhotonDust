@@ -24,6 +24,7 @@ namespace ve
         DescriptorSetHandler dsh;
         std::vector<uint32_t> path_trace_images;
         std::vector<uint32_t> path_trace_buffers;
+        std::vector<uint32_t> path_depth_buffers;
 
         uint32_t scene_texture_count;
 
@@ -34,6 +35,7 @@ namespace ve
             uint32_t emission_view = 0;
             uint32_t normal_view = 0;
             uint32_t tex_view = 0;
+            uint32_t path_depth_view = 0;
         } ptpc;
 
         void create_pipeline();

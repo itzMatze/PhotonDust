@@ -16,6 +16,9 @@ namespace ve
         std::vector<float> initial_buffer_data(app_state.render_extent.width * app_state.render_extent.height * 4, 0);
         path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_0", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
         path_trace_buffers.push_back(storage.add_named_buffer("path_trace_buffer_1", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
+        initial_buffer_data.resize(app_state.render_extent.width * app_state.render_extent.height, 0.0);
+        path_depth_buffers.push_back(storage.add_named_buffer("path_depth_buffer_0", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
+        path_depth_buffers.push_back(storage.add_named_buffer("path_depth_buffer_1", initial_buffer_data, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.compute));
     }
 
     void PathTracer::construct(VulkanCommandContext& vcc)
@@ -29,6 +32,8 @@ namespace ve
         path_trace_images.clear();
         for (uint32_t i : path_trace_buffers) storage.destroy_buffer(i);
         path_trace_buffers.clear();
+        for (uint32_t i : path_depth_buffers) storage.destroy_buffer(i);
+        path_depth_buffers.clear();
         pipeline.destruct();
         dsh.destruct();
     }
@@ -57,6 +62,7 @@ namespace ve
         ptpc.emission_view = app_state.emission_view;
         ptpc.normal_view = app_state.normal_view;
         ptpc.tex_view = app_state.tex_view;
+        ptpc.path_depth_view = app_state.path_depth_view;
         if ((ptpc.attenuation_view | ptpc.emission_view | ptpc.normal_view | ptpc.tex_view) != 0) app_state.sample_count = 0;
         ptpc.sample_count = app_state.sample_count;
         cb.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline.get());
@@ -83,6 +89,8 @@ namespace ve
         dsh.add_binding(3, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(4, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(5, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(6, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(7, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(10, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(11, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(12, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
@@ -98,6 +106,8 @@ namespace ve
             dsh.add_descriptor(i, 3, storage.get_image(path_trace_images[1 - i]));
             dsh.add_descriptor(i, 4, storage.get_buffer(path_trace_buffers[i]));
             dsh.add_descriptor(i, 5, storage.get_buffer(path_trace_buffers[1 - i]));
+            dsh.add_descriptor(i, 6, storage.get_buffer(path_depth_buffers[i]));
+            dsh.add_descriptor(i, 7, storage.get_buffer(path_depth_buffers[1 - i]));
             dsh.add_descriptor(i, 10, storage.get_buffer_by_name("vertices"));
             dsh.add_descriptor(i, 11, storage.get_buffer_by_name("indices"));
             dsh.add_descriptor(i, 12, storage.get_buffer_by_name("materials"));

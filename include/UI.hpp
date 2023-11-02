@@ -31,6 +31,7 @@ namespace ve
         bool emission_view = false;
         bool normal_view = false;
         bool tex_view = false;
+        bool path_depth_view = false;
         bool save_screenshot = false;
         bool accumulate_samples = true;
         bool force_accumulate_samples = false;

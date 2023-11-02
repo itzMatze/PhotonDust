@@ -4,6 +4,7 @@ struct PathTracerPushConstants {
     bool emission_view;
     bool normal_view;
     bool tex_view;
+    bool path_depth_view;
 };
 
 struct CameraData

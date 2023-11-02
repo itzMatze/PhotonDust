@@ -4,7 +4,7 @@
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_ray_query : enable
 
-#include "structs.glsl"
+#include "include/structs.glsl"
 
 #define PI 3.1415926535897932384626433832
 #define INV_PI 0.3183098861837906715377675267
@@ -23,6 +23,8 @@ layout(binding = 2, rgba8) uniform restrict readonly image2D input_image;
 layout(binding = 3, rgba8) uniform restrict writeonly image2D output_image;
 layout(binding = 4) readonly buffer InputPixelBuffer { PixelData input_pixel_data[]; };
 layout(binding = 5) writeonly buffer OutputPixelBuffer { PixelData output_pixel_data[]; };
+layout(binding = 6) readonly buffer InputPathDepthBuffer { float input_path_depth_data[]; };
+layout(binding = 7) writeonly buffer OutputPathDepthBuffer { float output_path_depth_data[]; };
 layout(binding = 10) readonly buffer VertexBuffer { AlignedVertex vertices[]; };
 layout(binding = 11) readonly buffer IndexBuffer { uint indices[]; };
 layout(binding = 12) readonly buffer MaterialBuffer { Material materials[]; };
@@ -31,8 +33,9 @@ layout(binding = 14) readonly buffer ModelMRDIndicesBuffer { uint model_mrd_indi
 layout(binding = 15) uniform sampler2D tex_sampler[TEXTURE_COUNT];
 layout(binding = 16) readonly buffer LightBuffer { Light lights[]; };
 
-#include "random.glsl"
-#include "spectral.glsl"
+#include "include/random.glsl"
+#include "include/spectral.glsl"
+#include "include/colormaps.glsl"
 
 bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out int geometry_idx, out int primitive_idx, out vec2 bary)
 {
@@ -278,6 +281,7 @@ void main()
     vec2 bary = vec2(0.0);
     Vertex vertex;
     MeshRenderData mrd;
+    float path_depth = 0.0f;
     for (uint i = 0; i < MAX_PATH_LENGTH; ++i)
     {
         if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
@@ -303,8 +307,13 @@ void main()
         // russian roulette
         float survival_prob = min(max(max(attenuation.r, attenuation.g), attenuation.b) + 0.8, 1.0);
         if (pcg_random_state() < survival_prob) attenuation /= survival_prob;
-        else break;
+        else
+        {
+            path_depth = i;
+            break;
+        }
     }
+    uint lin_idx = pixel.y * viewport_size.x + pixel.x;
     if (pc.attenuation_view) out_color = attenuation;
     else if (pc.emission_view) out_color = emission;
     else if (pc.normal_view) out_color = vec4((vertex.normal + 1.0) / 2.0, 1.0);
@@ -316,10 +325,15 @@ void main()
         out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability() * ((pow(dot(normalize(pixel_pos - camera_data.pos), -camera_data.w), 2) * (camera_data.sensor_size.x * camera_data.sensor_size.y)) / pow(length(pixel_pos - camera_data.pos), 2));
         if (pc.sample_count > 0)
         {
+            float weight_old = float(pc.sample_count - 1) / float(pc.sample_count);
+            float weight_new = 1.0 / float(pc.sample_count);
             // interpolate with previous samples
-            out_color = input_pixel_data[pixel.y * viewport_size.x + pixel.x].col * float(pc.sample_count - 1) / float(pc.sample_count) + out_color / float(pc.sample_count);
+            out_color = input_pixel_data[lin_idx].col * weight_old + out_color * weight_new;
+            path_depth = input_path_depth_data[lin_idx] * weight_old + path_depth * weight_new;
         }
     }
-    output_pixel_data[pixel.y * viewport_size.x + pixel.x].col = out_color;
-    imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color * exposure, vec4(INV_GAMMA)));
+    output_pixel_data[lin_idx].col = out_color;
+    output_path_depth_data[lin_idx] = path_depth;
+    if (pc.path_depth_view) imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), vec4(viridis(path_depth / float(MAX_PATH_LENGTH - 1)), 1.0));
+    else imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color * exposure, vec4(INV_GAMMA)));
 }

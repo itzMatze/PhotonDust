@@ -73,9 +73,10 @@ namespace ve
 
     void PathTracer::create_pipeline()
     {
-        std::array<vk::SpecializationMapEntry, 1> path_tracer_entries;
+        std::array<vk::SpecializationMapEntry, 2> path_tracer_entries;
         path_tracer_entries[0] = vk::SpecializationMapEntry(0, 0, sizeof(uint32_t));
-        std::array<uint32_t, 1> path_tracer_entries_data{scene_texture_count};
+        path_tracer_entries[1] = vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t));
+        std::array<uint32_t, 2> path_tracer_entries_data{scene_texture_count, uint32_t(storage.get_buffer_by_name("emissive_mesh_indices").get_element_count())};
         vk::SpecializationInfo path_tracer_spec_info(path_tracer_entries.size(), path_tracer_entries.data(), sizeof(uint32_t) * path_tracer_entries_data.size(), path_tracer_entries_data.data());
         ShaderInfo path_tracer_shader_info = ShaderInfo{"path_trace.comp", vk::ShaderStageFlagBits::eFragment, path_tracer_spec_info};
         pipeline.construct(dsh.get_layouts()[0], path_tracer_shader_info, sizeof(PathTracerPushConstants));
@@ -96,8 +97,9 @@ namespace ve
         dsh.add_binding(12, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(13, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         dsh.add_binding(14, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
-        dsh.add_binding(15, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute, scene_texture_count);
-        dsh.add_binding(16, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(15, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
+        dsh.add_binding(16, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute, scene_texture_count);
+        dsh.add_binding(17, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute);
         for (uint32_t i = 0; i < frames_in_flight; ++i)
         {
             dsh.add_descriptor(i, 0, storage.get_buffer_by_name("uniform_buffer"));
@@ -113,10 +115,11 @@ namespace ve
             dsh.add_descriptor(i, 12, storage.get_buffer_by_name("materials"));
             dsh.add_descriptor(i, 13, storage.get_buffer_by_name("mesh_render_data"));
             dsh.add_descriptor(i, 14, storage.get_buffer_by_name("model_mrd_indices"));
+            dsh.add_descriptor(i, 15, storage.get_buffer_by_name("emissive_mesh_indices"));
             std::vector<Image> images;
             for (uint32_t i = 0; i < scene_texture_count; ++i) images.push_back(storage.get_image_by_name("texture_" + std::to_string(i)));
-            dsh.add_descriptor(i, 15, images);
-            dsh.add_descriptor(i, 16, storage.get_buffer_by_name("lights"));
+            dsh.add_descriptor(i, 16, images);
+            dsh.add_descriptor(i, 17, storage.get_buffer_by_name("lights"));
         }
         dsh.construct();
     }

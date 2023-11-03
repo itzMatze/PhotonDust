@@ -22,6 +22,7 @@ namespace ve
         struct MeshRenderData {
             int32_t mat_idx;
             uint32_t indices_idx;
+            uint32_t idx_count;
         };
 
         struct ModelInfo {
@@ -45,6 +46,7 @@ namespace ve
         int32_t light_buffer = -1;
         uint32_t mesh_render_data_buffer;
         uint32_t model_mrd_indices_buffer;
+        uint32_t emissive_mesh_indices_buffer;
         PathTraceBuilder path_tracer;
     };
 } // namespace ve

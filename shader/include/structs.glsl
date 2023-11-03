@@ -25,6 +25,7 @@ struct PixelData {
 struct MeshRenderData {
     int mat_idx;
     uint indices_idx;
+    uint idx_count;
 };
 
 struct Material {

@@ -21,6 +21,7 @@ namespace ve
     void Scene::destruct()
     {
         path_tracer.destruct();
+        storage.destroy_buffer(emissive_mesh_indices_buffer);
         storage.destroy_buffer(model_mrd_indices_buffer);
         storage.destroy_buffer(mesh_render_data_buffer);
         storage.destroy_buffer(light_buffer);
@@ -39,6 +40,7 @@ namespace ve
         std::vector<uint32_t> indices;
         std::vector<Material> materials;
         std::vector<MeshRenderData> mesh_render_data;
+        std::vector<uint32_t> emissive_mesh_indices;
         std::vector<Light> lights;
         std::vector<ModelInfo> model_infos;
 
@@ -55,9 +57,13 @@ namespace ve
             model_infos.back().mesh_render_data_idx = mesh_render_data.size();
             for (Mesh& mesh : model.meshes)
             {
-                mesh_render_data.push_back(MeshRenderData{.mat_idx = mesh.material_idx, .indices_idx = mesh.index_offset});
+                mesh_render_data.push_back(MeshRenderData{.mat_idx = mesh.material_idx, .indices_idx = mesh.index_offset, .idx_count = mesh.index_count});
                 model_infos.back().mesh_index_offsets.push_back(mesh.index_offset);
                 model_infos.back().mesh_index_count.push_back(mesh.index_count);
+                if (glm::length(materials[mesh.material_idx].emission) > 0.0 && materials[mesh.material_idx].emission_strength > 0.0)
+                {
+                    emissive_mesh_indices.push_back(mesh_render_data.size() - 1);
+                }
             }
         };
 
@@ -127,6 +133,7 @@ namespace ve
         std::vector<uint32_t> model_mrd_indices;
         for (const auto& model : model_infos) model_mrd_indices.push_back(model.mesh_render_data_idx);
         model_mrd_indices_buffer = storage.add_named_buffer("model_mrd_indices", model_mrd_indices, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics);
+        emissive_mesh_indices_buffer = storage.add_named_buffer("emissive_mesh_indices", emissive_mesh_indices, vk::BufferUsageFlagBits::eStorageBuffer, true, vmc.queue_family_indices.transfer, vmc.queue_family_indices.graphics);
 
         std::vector<unsigned char> texture_data(4, 0);
         texture_image_indices.push_back(storage.add_named_image("texture_" + std::to_string(texture_image_indices.size()), texture_data.data(), 1, 1, true, 0, std::vector<uint32_t>{vmc.queue_family_indices.graphics, vmc.queue_family_indices.compute, vmc.queue_family_indices.transfer}, vk::ImageUsageFlagBits::eSampled));

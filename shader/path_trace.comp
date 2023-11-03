@@ -14,6 +14,7 @@
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(constant_id = 0) const uint TEXTURE_COUNT = 1;
+layout(constant_id = 1) const uint EMISSIVE_MESH_COUNT = 1;
 
 layout(push_constant) uniform PushConstant { PathTracerPushConstants pc; };
 
@@ -30,12 +31,22 @@ layout(binding = 11) readonly buffer IndexBuffer { uint indices[]; };
 layout(binding = 12) readonly buffer MaterialBuffer { Material materials[]; };
 layout(binding = 13) readonly buffer MeshRenderDataBuffer { MeshRenderData mesh_render_data[]; };
 layout(binding = 14) readonly buffer ModelMRDIndicesBuffer { uint model_mrd_indices[]; };
-layout(binding = 15) uniform sampler2D tex_sampler[TEXTURE_COUNT];
-layout(binding = 16) readonly buffer LightBuffer { Light lights[]; };
+layout(binding = 15) readonly buffer EmissiveMeshIndicesBuffer { uint emissive_mesh_indices[]; };
+layout(binding = 16) uniform sampler2D tex_sampler[TEXTURE_COUNT];
+layout(binding = 17) readonly buffer LightBuffer { Light lights[]; };
 
 #include "include/random.glsl"
 #include "include/spectral.glsl"
 #include "include/colormaps.glsl"
+
+bool evaluate_shadow_ray(in vec3 ro, in vec3 rd, in vec3 target)
+{
+    rayQueryEXT rayQuery;
+    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsNoneEXT, 0xFF, ro, 0.001, rd, distance(ro, target));
+    rayQueryProceedEXT(rayQuery);
+    if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) return false;
+    return true;
+}
 
 bool evaluate_ray(in vec3 ro, in vec3 rd, out float t, out int instance_id, out int geometry_idx, out int primitive_idx, out vec2 bary)
 {
@@ -167,35 +178,91 @@ vec3 fresnel_schlick(in float vh, in vec3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - vh, 5.0);
 }
 
-vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albedo, in float metallic, in float r)
+vec4 brdf_cook_torrance(in vec3 h, in vec3 l, in vec3 n, in vec3 v, in vec3 albedo, in float metallic, in float r, in bool h_importance_sampled)
 {
     float nh = clamp(dot(n, h), 0.0, 1.0);
     float nv = clamp(dot(n, v), 0.0, 1.0);
     float nl = clamp(dot(n, l), 0.0, 1.0);
     float vh = clamp(dot(v, h), 0.0, 1.0);
 
-    // float D = ndf_ggx(nh, r);
+    float D = ndf_ggx(nh, r);
     float G = geometry_schlick_ggx(nl, nv, r);
     vec3 F = fresnel_schlick(vh, albedo);
     // Microfacet specular = D * G * F / (4 * nl * nv)
     // pdf = D * nh / (4 * vh)
     // solid angle cosine = nl
-    vec3 specular = nl > 0 ? (F * G * vh) / max((nh * nv), EPS) : vec3(0.0);
-    return vec4(specular, 1.0);
+    vec3 result;
+    if (h_importance_sampled)
+    {
+        // divide by pdf
+        result = (nl > 0 ? ((F * G * vh) / max((nh * nv), EPS)) : vec3(0.0));
+    }
+    else
+    {
+        result = (nl > 0 ? ((D * G * F) / max((4 * nv), EPS)) : vec3(0.0));
+    }
+    return vec4(result, 1.0);
 }
 
-void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, in float t, inout vec4 emission, inout vec4 attenuation, out vec3 l)
+float get_triangle_size(in MeshRenderData mrd, in int primitive_idx)
+{
+    vec3 p0 = get_vertex_pos(vertices[indices[mrd.indices_idx + primitive_idx * 3]]);
+    vec3 p1 = get_vertex_pos(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 1]]);
+    vec3 p2 = get_vertex_pos(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 2]]);
+    vec3 v1 = p1 - p0;
+    vec3 v2 = p2 - p0;
+    vec3 n = cross(v1, v2);
+    return 0.5 * length(n);
+}
+
+Vertex interpolate_attributes(in MeshRenderData mrd, in int primitive_idx, in vec2 bary)
+{
+    Vertex v0 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3]]);
+    Vertex v1 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 1]]);
+    Vertex v2 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 2]]);
+    Vertex v;
+    v.pos = (1.0 - bary.x - bary.y) * v0.pos + bary.x * v1.pos + bary.y * v2.pos;
+    v.normal = normalize((1.0 - bary.x - bary.y) * v0.normal + bary.x * v1.normal + bary.y * v2.normal);
+    v.color = (1.0 - bary.x - bary.y) * v0.color + bary.x * v1.color + bary.y * v2.color;
+    v.tex = (1.0 - bary.x - bary.y) * v0.tex + bary.x * v1.tex + bary.y * v2.tex;
+    return v;
+}
+
+vec4 NEE_contribution(in MeshRenderData mrd, in Vertex vertex, out vec3 dir)
+{
+    // pick light and perform NEE except current surface is a light and NEE picked this light
+    MeshRenderData light_mrd = mesh_render_data[emissive_mesh_indices[uint(pcg_random_state() * EMISSIVE_MESH_COUNT)]];
+    if (mrd.indices_idx != light_mrd.indices_idx)
+    {
+        vec2 bary = vec2(pcg_random_state(), pcg_random_state());
+        int triangle_idx = int(pcg_random_state() * light_mrd.idx_count / 3.0);
+        Vertex light_vertex = interpolate_attributes(light_mrd, triangle_idx, bary);
+        dir = normalize(light_vertex.pos - vertex.pos);
+        if (evaluate_shadow_ray(vertex.pos, dir, light_vertex.pos))
+        {
+            // probability to choose light
+            float inv_prob = get_triangle_size(light_mrd, triangle_idx) / ((1.0 / float(EMISSIVE_MESH_COUNT)) * (1.0 / float(light_mrd.idx_count / 3)));
+            // from vertex area measure to solid angle
+            float geometry_term = dot(dir, vertex.normal) * dot(-dir, light_vertex.normal) / max((pow(1 + distance(light_vertex.pos, vertex.pos), 2)), EPS);
+            return materials[light_mrd.mat_idx].emission * materials[light_mrd.mat_idx].emission_strength * max(inv_prob * geometry_term, 0.0);
+        }
+    }
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v, in uint wavelength, in float t, inout bool last_interaction_nee, inout vec4 emission, inout vec4 attenuation, out vec3 l)
 {
     // object does not have material, make it fully diffuse with the vertex color
     if (mrd.mat_idx < 0)
     {
+        vec4 nee = NEE_contribution(mrd, vertex, l);
+        emission += attenuation * brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color * nee;
         l = cosine_sample_hemisphere(vertex.normal);
         attenuation *= brdf_oren_nayar(l, vertex.normal, v, 1.0) * vertex.color;
+        last_interaction_nee = true;
         return;
     }
     Material m = materials[mrd.mat_idx];
-    // add attenuated emission of material
-    emission += attenuation * m.emission * m.emission_strength;
     // get color of material at position
     vec4 color = vec4(0.0);
     if (m.base_texture >= 0) color = texture(tex_sampler[m.base_texture], vertex.tex);
@@ -222,36 +289,38 @@ void apply_surface_parameters(in MeshRenderData mrd, in Vertex vertex, in vec3 v
         }
         float F = fresnel_schlick(dot(v, vertex.normal), ref_idx_one, ref_idx_two);
         l = refract(-v, vertex.normal, ref_idx_one / ref_idx_two);
-        if (length(l) > 0.1 && pcg_random_state() > F) return;
-        else l = reflect(-v, vertex.normal);
+        if (length(l) < 0.1 || pcg_random_state() < F) l = reflect(-v, vertex.normal);
+        last_interaction_nee = false;
+        return;
     }
     else
     {
+        if (!last_interaction_nee)
+        {
+            // last interaction did not perform NEE, add contribution of randomly hit light
+            // add attenuated emission of material
+            emission += attenuation * m.emission * m.emission_strength;
+        }
         // surface reflection
         if (pcg_random_state() < m.metallic)
         {
-            vec3 h = importance_sample_ggx(vertex.normal, m.roughness);
+            vec4 nee = NEE_contribution(mrd, vertex, l);
+            vec3 h = normalize(v + l);
+            emission += attenuation * brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness, false) * nee;
+            h = importance_sample_ggx(vertex.normal, m.roughness);
             l = reflect(-v, h);
-            attenuation *= brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness);
+            attenuation *= brdf_cook_torrance(h, l, vertex.normal, v, color.rgb, m.metallic, m.roughness, true);
         }
         else
         {
+            vec4 nee = NEE_contribution(mrd, vertex, l);
+            emission += attenuation * brdf_oren_nayar(l, vertex.normal, v, 1.0) * color * nee;
             l = cosine_sample_hemisphere(vertex.normal);
             attenuation *= brdf_oren_nayar(l, vertex.normal, v, m.roughness) * color;
         }
+        last_interaction_nee = true;
+        return;
     }
-}
-
-Vertex interpolate_attributes(in MeshRenderData mrd, in int primitive_idx, in vec2 bary)
-{
-    Vertex v0 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3]]);
-    Vertex v1 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 1]]);
-    Vertex v2 = unpack_vertex(vertices[indices[mrd.indices_idx + primitive_idx * 3 + 2]]);
-    Vertex v;
-    v.normal = normalize((1.0 - bary.x - bary.y) * v0.normal + bary.x * v1.normal + bary.y * v2.normal);
-    v.color = (1.0 - bary.x - bary.y) * v0.color + bary.x * v1.color + bary.y * v2.color;
-    v.tex = (1.0 - bary.x - bary.y) * v0.tex + bary.x * v1.tex + bary.y * v2.tex;
-    return v;
 }
 
 #define MAX_PATH_LENGTH 128
@@ -282,6 +351,7 @@ void main()
     Vertex vertex;
     MeshRenderData mrd;
     float path_depth = 0.0f;
+    bool last_interaction_nee = false;
     for (uint i = 0; i < MAX_PATH_LENGTH; ++i)
     {
         if (evaluate_ray(p, dir, t, instance_id, geometry_idx, primitive_idx, bary))
@@ -290,7 +360,7 @@ void main()
             vertex = interpolate_attributes(mrd, primitive_idx, bary);
             vec3 v = -dir;
             p = p + dir * t;
-            apply_surface_parameters(mrd, vertex, v, wavelength, t, emission, attenuation, dir);
+            apply_surface_parameters(mrd, vertex, v, wavelength, t, last_interaction_nee, emission, attenuation, dir);
             if (pc.attenuation_view || pc.emission_view || pc.normal_view || pc.tex_view)
             {
                 exposure = 1.0;

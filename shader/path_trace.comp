@@ -392,7 +392,7 @@ void main()
     {
         // out_color is attenuated accumulated emission multiplied with spectral rgb response divided by probability of spectral sample
         // also divide by probability of sampled pixel, given by the geometry term and surface of sensor, cosine of outgoing direction and at sensor are the same
-        out_color = emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability() * ((pow(dot(normalize(pixel_pos - camera_data.pos), -camera_data.w), 2) * (camera_data.sensor_size.x * camera_data.sensor_size.y)) / pow(length(pixel_pos - camera_data.pos), 2));
+        out_color = rgb_to_xyz(emission * wavelength_to_rgba(wavelength) * get_inv_wavelength_probability() * ((pow(dot(normalize(pixel_pos - camera_data.pos), -camera_data.w), 2) * (camera_data.sensor_size.x * camera_data.sensor_size.y)) / pow(length(pixel_pos - camera_data.pos), 2)));
         if (pc.sample_count > 0)
         {
             float weight_old = float(pc.sample_count - 1) / float(pc.sample_count);
@@ -405,5 +405,5 @@ void main()
     output_pixel_data[lin_idx].col = out_color;
     output_path_depth_data[lin_idx] = path_depth;
     if (pc.path_depth_view) imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), vec4(viridis(path_depth / float(MAX_PATH_LENGTH - 1)), 1.0));
-    else imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(out_color * exposure, vec4(INV_GAMMA)));
+    else imageStore(output_image, ivec2(pixel.x, viewport_size.y - pixel.y), pow(xyz_to_rgb(out_color * exposure), vec4(INV_GAMMA)));
 }

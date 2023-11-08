@@ -28,79 +28,30 @@ vec3 cie_colour_match[81] = {
     vec3(0.0001f,0.0000f,0.0000f), vec3(0.0001f,0.0000f,0.0000f), vec3(0.0000f,0.0000f,0.0000f)
 };
 
-vec3 xyz_to_rgb(in vec3 xyz)
+vec4 rgb_to_xyz(in vec4 rgb)
 {
-    // https://www.fourmilab.ch/documents/specrend/
-    const float xr = 0.7355f;
-    const float yr = 0.2645f;
-    const float zr = 1 - xr - yr;
-    const float xg = 0.2658f;
-    const float yg = 0.7243f;
-    const float zg = 1 - xg - yg;
-    const float xb = 0.1669f;
-    const float yb = 0.0085f;
-    const float zb = 1 - xb - yb;
-    const float xw = 0.33333333f;
-    const float yw = 0.33333333f;
-    const float zw = 0.33333333f;
+    const mat3 M = mat3(0.4887180, 0.1762044, 0.0,
+                        0.3106803, 0.8129847, 0.0102048,
+                        0.2006017, 0.0108109, 0.9897952);
+    return vec4(M * rgb.rgb, rgb.a);
+}
 
-    // xyz -> rgb matrix, before scaling to white
-    const float rx = (yg * zb) - (yb * zg);
-    const float ry = (xb * zg) - (xg * zb);
-    const float rz = (xg * yb) - (xb * yg);
-    const float gx = (yb * zr) - (yr * zb);
-    const float gy = (xr * zb) - (xb * zr);
-    const float gz = (xb * yr) - (xr * yb);
-    const float bx = (yr * zg) - (yg * zr);
-    const float by = (xg * zr) - (xr * zg);
-    const float bz = (xr * yg) - (xg * yr);
+vec4 xyz_to_rgb(in vec4 xyz)
+{
+    const mat3 M = mat3(2.3706743, -0.5138850, 0.0052982,
+                        -0.9000405, 1.4253036, -0.0146949,
+                        -0.4706338, 0.0885814, 1.0093968);
+    return vec4(M * xyz.xyz, xyz.a);
+}
 
-    // White scaling factors. Dividing by yw scales the white luminance to unity, as conventional
-    const float rw = ((rx * xw) + (ry * yw) + (rz * zw)) / yw;
-    const float gw = ((gx * xw) + (gy * yw) + (gz * zw)) / yw;
-    const float bw = ((bx * xw) + (by * yw) + (bz * zw)) / yw;
-
-    // xyz -> rgb matrix, correctly scaled to white
-    const float scaled_rx = rx / rw;
-    const float scaled_ry = ry / rw;
-    const float scaled_rz = rz / rw;
-    const float scaled_gx = gx / gw;
-    const float scaled_gy = gy / gw;
-    const float scaled_gz = gz / gw;
-    const float scaled_bx = bx / bw;
-    const float scaled_by = by / bw;
-    const float scaled_bz = bz / bw;
-
-    // rgb of the desired point
-    vec3 rgb;
-    rgb.r = (scaled_rx * xyz.x) + (scaled_ry * xyz.y) + (scaled_rz * xyz.z);
-    rgb.g = (scaled_gx * xyz.x) + (scaled_gy * xyz.y) + (scaled_gz * xyz.z);
-    rgb.b = (scaled_bx * xyz.x) + (scaled_by * xyz.y) + (scaled_bz * xyz.z);
-
-    // Amount of white needed is w = - min(0, r, g, b)
-    float w = (0.0f < rgb.r) ? 0.0f : rgb.r;
-    w = (w < rgb.g) ? w : rgb.g;
-    w = (w < rgb.b) ? w : rgb.b;
-    w = -w;
-
-    // Add just enough white to make r, g, b all positive
-    rgb.r += w;
-    rgb.g += w;
-    rgb.b += w;
-
-    float greatest = max(rgb.r, max(rgb.g, rgb.b));
-    if (greatest > 0.0f) {
-        rgb.r /= greatest;
-        rgb.g /= greatest;
-        rgb.b /= greatest;
-    }
-    return rgb;
+vec4 wavelength_to_xyz(uint wavelength)
+{
+    return vec4(cie_colour_match[(wavelength - 380) / 5], 1.0f);
 }
 
 vec4 wavelength_to_rgba(uint wavelength)
 {
-    // divide by average response
-    return vec4(xyz_to_rgb(cie_colour_match[(wavelength - 380) / 5]) * vec3(1.0f / 0.542192f, 1.0f / 0.275452f, 1.0f / 0.347872f), 1.0f);
+    return xyz_to_rgb(wavelength_to_xyz(wavelength));
 }
 
 uint get_random_wavelength(float random)

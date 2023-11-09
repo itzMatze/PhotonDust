@@ -42,7 +42,7 @@ layout(binding = 17) readonly buffer LightBuffer { Light lights[]; };
 bool evaluate_shadow_ray(in vec3 ro, in vec3 rd, in vec3 target)
 {
     rayQueryEXT rayQuery;
-    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsNoneEXT, 0xFF, ro, 0.001, rd, distance(ro, target));
+    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsNoneEXT, 0xFF, ro, 0.001, rd, distance(ro, target) - 0.001);
     rayQueryProceedEXT(rayQuery);
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) return false;
     return true;
@@ -235,6 +235,7 @@ vec4 NEE_contribution(in MeshRenderData mrd, in Vertex vertex, out vec3 dir)
     if (mrd.indices_idx != light_mrd.indices_idx)
     {
         vec2 bary = vec2(pcg_random_state(), pcg_random_state());
+        if (bary.x + bary.y > 1.0) bary = 1.0 - bary;
         int triangle_idx = int(pcg_random_state() * light_mrd.idx_count / 3.0);
         Vertex light_vertex = interpolate_attributes(light_mrd, triangle_idx, bary);
         dir = normalize(light_vertex.pos - vertex.pos);

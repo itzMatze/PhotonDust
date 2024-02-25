@@ -3,7 +3,6 @@
 #include <fstream>
 #include <filesystem>
 #include <iostream>
-#include <vector>
 
 #include "ve_log.hpp"
 

@@ -107,10 +107,10 @@ namespace ve
 
     void WorkContext::draw_frame(AppState& app_state)
     {
-        vk::ResultValue<uint32_t> image_idx = vmc.logical_device.get().acquireNextImageKHR(swapchain->get(), uint64_t(-1), syncs[app_state.current_frame].get_semaphore(Synchronization::S_IMAGE_AVAILABLE));
-        VE_CHECK(image_idx.result, "Failed to acquire next image!");
         syncs[app_state.current_frame].wait_for_fence(Synchronization::F_RENDER_FINISHED);
         syncs[app_state.current_frame].reset_fence(Synchronization::F_RENDER_FINISHED);
+        vk::ResultValue<uint32_t> image_idx = vmc.logical_device.get().acquireNextImageKHR(swapchain->get(), uint64_t(-1), syncs[app_state.current_frame].get_semaphore(Synchronization::S_IMAGE_AVAILABLE));
+        VE_CHECK(image_idx.result, "Failed to acquire next image!");
         if (app_state.current_frame == 0)
         {
             app_state.cam.update_data();
@@ -120,7 +120,7 @@ namespace ve
             syncs[0].reset_fence(Synchronization::F_COMPUTE_FINISHED);
             storage.get_buffer(uniform_buffer).update_data_bytes(&app_state.cam.data, sizeof(Camera::Data));
         }
-        for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT; ++i)
+        for (uint32_t i = 0; i < DeviceTimer::TIMER_COUNT && app_state.current_frame > timers.size(); ++i)
         {
             double timing = timers[app_state.current_frame].get_result_by_idx(i);
             app_state.devicetimings[i] = timing;

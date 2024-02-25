@@ -1,12 +1,10 @@
 #pragma once
 
-#include <string>
 #include <vector>
 #include <glm/mat4x4.hpp>
 
 #include "json.hpp"
 
-#include "vk/Image.hpp"
 #include "vk/Mesh.hpp"
 #include "Storage.hpp"
 

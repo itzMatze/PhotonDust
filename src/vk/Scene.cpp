@@ -1,7 +1,8 @@
 #include "vk/Scene.hpp"
 
 #include <fstream>
-#include <glm/gtx/transform.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/quaternion_transform.hpp>
 
 #include "json.hpp"
 

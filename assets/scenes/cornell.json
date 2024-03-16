@@ -1,0 +1,127 @@
+{
+    "model_files": [
+        {
+            "name": "cube_silver",
+            "file": "cube.glb",
+            "scale": [1.0, 1.0, 1.0],
+            "translation": [2.0, -3.99, -1.0],
+            "rotation": [45, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [0.753, 0.753, 0.753, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0],
+                "roughness": 0.01,
+                "metallic": 0.0
+            }
+        },
+        {
+            "name": "cube_front",
+            "file": "coarse_sphere.glb",
+            "scale": [0.8, 0.8, 0.8],
+            "translation": [0.0, -3.0, 3.0],
+            "rotation": [0, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 1.0, 1.0, 0.99],
+                "emission": [0.0, 0.0, 0.0, 0.0],
+                "roughness": 0.0,
+                "metallic": 0.0,
+                "transmission": 1.0,
+                "sellmeier_coefficients":
+                {
+                    "B": [0.3306, 4.3356, 0.0],
+                    "C": [0.030625, 0.011236, 0.0]
+                }
+            }
+        },
+        {
+            "name": "cube_gold",
+            "file": "cube.glb",
+            "scale": [1.0, 1.0, 1.0],
+            "translation": [-2.0, -3.99, -2.0],
+            "rotation": [45, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 0.843, 0.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0],
+                "roughness": 0.0,
+                "metallic": 0.9
+            }
+        },
+        {
+            "name": "cube_light_0",
+            "file": "cube.glb",
+            "scale": [0.1, 0.1, 0.1],
+            "translation": [0.2, -2.0, 3.9],
+            "rotation": [0, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [0.0, 0.0, 0.0, 1.0],
+                "emission": [1.0, 1.0, 1.0, 1.0],
+                "emission_strength": 128.0
+            }
+        },
+        {
+            "name": "floor",
+            "file": "plane.glb",
+            "scale": [5.0, 5.0, 5.0],
+            "translation": [0.0, -5.0, 0.0],
+            "rotation": [0, 0.0, 1.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 1.0, 1.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0]
+            }
+        },
+        {
+            "name": "top",
+            "file": "plane.glb",
+            "scale": [5.0, 5.0, 5.0],
+            "translation": [0.0, 5.0, 0.0],
+            "rotation": [180, 1.0, 0.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 1.0, 1.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0]
+            }
+        },
+        {
+            "name": "back",
+            "file": "plane.glb",
+            "scale": [5.0, 5.0, 5.0],
+            "translation": [0.0, 0.0, -5.0],
+            "rotation": [90, 1.0, 0.0, 0.0],
+            "material":
+            {
+                "base_color": [1.0, 1.0, 1.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0]
+            }
+        },
+        {
+            "name": "left",
+            "file": "plane.glb",
+            "scale": [5.0, 5.0, 5.0],
+            "translation": [-5.0, 0.0, 0.0],
+            "rotation": [-90, 0.0, 0.0, 1.0],
+            "material":
+            {
+                "base_color": [1.0, 0.0, 0.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0]
+            }
+        },
+        {
+            "name": "right",
+            "file": "plane.glb",
+            "scale": [5.0, 5.0, 5.0],
+            "translation": [5.0, 0.0, 0.0],
+            "rotation": [90, 0.0, 0.0, 1.0],
+            "material":
+            {
+                "base_color": [0.0, 0.0, 1.0, 1.0],
+                "emission": [0.0, 0.0, 0.0, 0.0]
+            }
+        }
+    ],
+    "custom_models": [
+    ]
+}
